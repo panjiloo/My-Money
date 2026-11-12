@@ -294,7 +294,7 @@ with st.container(border=True):
             ]
         else:
             baris_kategori = [
-                [("🥗", "Makan & Dapur"), ("🧸", "Kebutuhan Anak")],
+                [("🥗", "Makan & Jajan"), ("🧸", "Kebutuhan Anak")],
                 [("🎒", "Pendidikan Anak"), ("🏠", "Cicilan"), ("💡", "Listrik, Air & Iuran")],
                 [("👨‍👩‍👧", "Keluarga (Adik/Uti)"), ("⛽", "Transportasi & BBM")],
                 [("📶", "Pulsa & Internet"), ("💊", "Kesehatan")],
