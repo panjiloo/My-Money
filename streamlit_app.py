@@ -8,20 +8,20 @@ import requests
 
 # 1. Konfigurasi Halaman
 st.set_page_config(
-    page_title="Catat Transaksi - Panji & Feby",
+    page_title="Catat Transaksi - Panji & Febby",
     page_icon="💰",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# URL Web App Google Apps Script Anda
+# URL Web App Google Apps Script Anda (Sudah Terpasang)
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwqn9gHoy2ucq237Lr-0mevxh_7anpTPHym4r3IG1jChXvIY4RK-I9VfaEfYHbE00M2/exec"
 
 # 2. Inisialisasi Session State
 if "tipe" not in st.session_state:
     st.session_state.tipe = "Pengeluaran"
 if "kategori" not in st.session_state:
-    st.session_state.kategori = "Pilih Kategori..."
+    st.session_state.kategori = "Kategori"
 if "buka_pilih_kategori" not in st.session_state:
     st.session_state.buka_pilih_kategori = False
 if "dibayar_oleh" not in st.session_state:
@@ -29,7 +29,7 @@ if "dibayar_oleh" not in st.session_state:
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
 
-# 3. Custom CSS
+# 3. Custom CSS (Font hitam pekat & styling interaktif)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -88,13 +88,14 @@ st.markdown("""
         margin-bottom: 6px;
     }
 
+    /* Input Nominal: Font hitam pekat & besar */
     div[data-testid="stNumberInput"] input {
         background-color: #F8F7F4 !important;
         border: 1.8px solid #355E4B !important;
         border-radius: 14px !important;
         font-size: 26px !important;
         font-weight: 700 !important;
-        color: #5A5D58 !important;
+        color: #000000 !important;
         padding: 12px 16px !important;
         height: 58px !important;
     }
@@ -112,9 +113,13 @@ st.markdown("""
         box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
     }
 
+    div.stButton > button p {
+        font-weight: inherit !important;
+    }
+
     div.stButton > button[kind="secondary"] {
         background-color: #F8F7F4 !important;
-        color: #2C302E !important;
+        color: #000000 !important;
         border: 1px solid #EAE7DD !important;
     }
     div.stButton > button[kind="secondary"]:hover {
@@ -135,10 +140,12 @@ st.markdown("""
         border-radius: 12px !important;
         height: 46px !important;
     }
+    
+    /* Tanggal & Catatan: Font hitam pekat */
     div[data-testid="stDateInput"] input,
     div[data-testid="stTextInput"] input {
-        color: #2C302E !important;
-        font-weight: 500 !important;
+        color: #000000 !important;
+        font-weight: 600 !important;
         font-size: 14px !important;
         background-color: transparent !important;
     }
@@ -198,7 +205,7 @@ components.html("""
     <div class="top-header">
         <div>
             <div class="greeting-sub" id="ucapan">Selamat malam,</div>
-            <div class="greeting-name">Panji & Feby</div>
+            <div class="greeting-name">Panji & Febby</div>
         </div>
         <div class="sync-badge">☁️ Tersinkron</div>
     </div>
@@ -233,7 +240,7 @@ with st.container(border=True):
             type="primary" if st.session_state.tipe == "Pemasukan" else "secondary"
         ):
             st.session_state.tipe = "Pemasukan"
-            st.session_state.kategori = "Pilih Kategori..."
+            st.session_state.kategori = "Kategori"
             st.session_state.buka_pilih_kategori = False
             st.rerun()
 
@@ -245,25 +252,26 @@ with st.container(border=True):
             type="primary" if st.session_state.tipe == "Pengeluaran" else "secondary"
         ):
             st.session_state.tipe = "Pengeluaran"
-            st.session_state.kategori = "Pilih Kategori..."
+            st.session_state.kategori = "Kategori"
             st.session_state.buka_pilih_kategori = False
             st.rerun()
 
-    # --- Input Nominal (Rp) ---
+    # --- Input Nominal (Rp) - value=None agar angka 0 otomatis hilang ---
     st.markdown('<div class="field-label">Nominal (Rp)</div>', unsafe_allow_html=True)
     nominal = st.number_input(
         "Nominal",
         min_value=0,
-        value=0,
+        value=None,
         step=1000,
+        placeholder="0",
         label_visibility="collapsed",
         key=f"input_nominal_{st.session_state.form_key}"
     )
 
-    # --- Tombol Kategori (Dropdown Akordeon) ---
+    # --- Tombol Kategori (Tulisan "Kategori" saja, font hitam bold) ---
     st.markdown('<div class="field-label">Kategori</div>', unsafe_allow_html=True)
     
-    label_tombol_kategori = f"📂 {st.session_state.kategori}"
+    label_tombol_kategori = f"**{st.session_state.kategori}**"
     if st.button(label_tombol_kategori, key="btn_buka_kategori", use_container_width=True):
         st.session_state.buka_pilih_kategori = not st.session_state.buka_pilih_kategori
         st.rerun()
@@ -276,9 +284,9 @@ with st.container(border=True):
             ]
         else:
             baris_kategori = [
-                [("🥗", "Makan & Dapur"), ("🧸", "Kebutuhan Anak")],
+                [("🥗", "Makan & Jajan"), ("🧸", "Kebutuhan Anak")],
                 [("🎒", "Pendidikan Anak"), ("🏠", "Cicilan"), ("💡", "Listrik, Air & Iuran")],
-                [("👨‍👩‍👧", "Keluarga (Adik/Uti)"), ("⛽", "Transportasi & BBM")],
+                [("👨‍👩‍👧", "Keluarga (Adik/Ortu/Saudara)"), ("⛽", "Transportasi & BBM")],
                 [("📶", "Pulsa & Internet"), ("💊", "Kesehatan")],
                 [("🧺", "Belanja Rumah Tangga"), ("🤲", "Sedekah & Sosial")],
                 [("🍦", "Hiburan & Jajan"), ("🐷", "Tabungan"), ("📈", "Investasi")],
@@ -304,7 +312,7 @@ with st.container(border=True):
     label_subjek = "Diterima oleh" if st.session_state.tipe == "Pemasukan" else "Dibayar oleh"
     st.markdown(f'<div class="field-label">{label_subjek}</div>', unsafe_allow_html=True)
     
-    opsi_pembayar = ["Panji", "Feby", "Bersama"]
+    opsi_pembayar = ["Panji", "Febby", "Bersama"]
     cols_payer = st.columns(3, gap="small")
     for idx, pembayar in enumerate(opsi_pembayar):
         with cols_payer[idx]:
@@ -340,19 +348,20 @@ with st.container(border=True):
             key=f"input_catatan_{st.session_state.form_key}"
         )
 
-    # --- Tombol Simpan Transaksi (Kirim ke Google Sheets via Web App) ---
+    # --- Tombol Submit (Kirim ke Google Sheets via Web App) ---
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
-    if st.button("Simpan Transaksi", type="primary", use_container_width=True):
-        if nominal > 0 and st.session_state.kategori != "Pilih Kategori...":
+    val_nominal = nominal if nominal is not None else 0
+    if st.button("Submit", type="primary", use_container_width=True):
+        if val_nominal > 0 and st.session_state.kategori != "Kategori":
             nama_hari = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"][tanggal.weekday()]
             bulan_str = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"][tanggal.month - 1]
             format_tgl_lengkap = f"{nama_hari}, {tanggal.day} {bulan_str} {tanggal.year}"
 
             jns_pengeluaran = st.session_state.kategori if st.session_state.tipe == "Pengeluaran" else ""
-            jml_pengeluaran = nominal if st.session_state.tipe == "Pengeluaran" else 0
+            jml_pengeluaran = val_nominal if st.session_state.tipe == "Pengeluaran" else 0
             
             jns_pemasukan = st.session_state.kategori if st.session_state.tipe == "Pemasukan" else ""
-            jml_pemasukan = nominal if st.session_state.tipe == "Pemasukan" else 0
+            jml_pemasukan = val_nominal if st.session_state.tipe == "Pemasukan" else 0
 
             payload = {
                 "Nama": st.session_state.dibayar_oleh,
@@ -368,10 +377,10 @@ with st.container(border=True):
             try:
                 response = requests.post(WEB_APP_URL, json=payload)
                 if response.status_code == 200:
-                    st.success(f"Berhasil tersimpan ke Google Sheets: {st.session_state.tipe} Rp {nominal:,}!")
+                    st.success(f"Berhasil tersimpan ke Google Sheets: {st.session_state.tipe} Rp {val_nominal:,}!")
                     # Kosongkan form input
                     st.session_state.form_key += 1
-                    st.session_state.kategori = "Pilih Kategori..."
+                    st.session_state.kategori = "Kategori"
                     st.rerun()
                 else:
                     st.error("Gagal mengirim data ke Google Sheets.")
@@ -384,19 +393,6 @@ with st.container(border=True):
     st.markdown("<hr style='margin: 24px 0 16px 0; border: 0; border-top: 1px solid #EAE7DD;'>", unsafe_allow_html=True)
     st.markdown('<div class="card-title" style="font-size: 17px;">Download Laporan Excel</div>', unsafe_allow_html=True)
 
-    # Membaca data langsung dari Google Sheets untuk keperluan download laporan
-    @st.cache_data(ttl=5)
-    def load_data_from_sheet(sheet_url):
-        try:
-            csv_url = sheet_url.replace('/edit?usp=sharing', '/export?format=csv&gid=0').replace('/edit', '/export?format=csv&gid=0')
-            df = pd.read_csv(csv_url)
-            return df
-        except Exception:
-            return pd.DataFrame()
-
-    df_database = load_data_from_sheet(WEB_APP_URL.replace("/exec", "/edit")) # atau gunakan URL share Google Sheets Anda
-
-    # Alternatif pembacaan CSV langsung dari link Google Sheets publik/share
     link_csv_sheets = st.text_input("Link CSV Google Sheets (Opsional untuk unduh laporan):", value="", placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv")
     
     if link_csv_sheets:
@@ -464,4 +460,4 @@ with st.container(border=True):
         except Exception:
             st.caption("Masukkan link export CSV Google Sheets dengan benar untuk mengaktifkan unduhan laporan.")
     else:
-            st.caption("Masukkan link CSV Spreadsheet di atas untuk mulai mendownload laporan berdasarkan data Google Sheets.")
+        st.caption("Masukkan link CSV Spreadsheet di atas untuk mulai mendownload laporan berdasarkan data Google Sheets.")
