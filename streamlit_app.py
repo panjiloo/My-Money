@@ -3,7 +3,7 @@ from datetime import datetime, date
 
 # 1. Konfigurasi Halaman
 st.set_page_config(
-    page_title="Catat Transaksi - Toni & Keke",
+    page_title="Catat Transaksi - Panji & Febby",
     page_icon="💰",
     layout="centered",
     initial_sidebar_state="collapsed"
