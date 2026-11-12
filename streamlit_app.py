@@ -287,7 +287,7 @@ with st.container(border=True):
         baris_kategori = [
             [("🥗", "Makan & Dapur"), ("🧸", "Kebutuhan Anak")],
             [("🎒", "Pendidikan Anak"), ("🏠", "Cicilan"), ("💡", "Listrik, Air & Iuran")],
-            [("👨‍👩‍👧", "Keluarga (Adik/Uti)"), ("⛽", "Transportasi & BBM")],
+            [("👨‍👩‍👧", "Keluarga (Adik/Ortu)"), ("⛽", "Transportasi & BBM")],
             [("📶", "Pulsa & Internet"), ("💊", "Kesehatan")],
             [("🧺", "Belanja Rumah Tangga"), ("🤲", "Sedekah & Sosial")],
             [("🍦", "Hiburan & Jajan"), ("🐷", "Tabungan"), ("📈", "Investasi")],
