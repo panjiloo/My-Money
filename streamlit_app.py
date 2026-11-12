@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -13,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Inisialisasi Session State (Termasuk Form Reset State)
+# 2. Inisialisasi Session State
 if "tipe" not in st.session_state:
     st.session_state.tipe = "Pengeluaran"
 if "kategori" not in st.session_state:
@@ -22,13 +23,31 @@ if "buka_pilih_kategori" not in st.session_state:
     st.session_state.buka_pilih_kategori = False
 if "dibayar_oleh" not in st.session_state:
     st.session_state.dibayar_oleh = "Bersama"
-if "database_transaksi" not in st.session_state:
-    st.session_state.database_transaksi = []
-# State unik untuk mereset input angka dan teks
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
 
-# 3. Custom CSS
+# 3. Koneksi ke Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# Fungsi mengambil data dari Google Sheets
+def load_data():
+    try:
+        df = conn.read(worksheet="Sheet1", ttl=0)
+        # Hapus baris kosong jika ada
+        df = df.dropna(how="all")
+        return df
+    except Exception:
+        # Jika sheet masih benar-benar kosong atau belum ada header
+        return pd.DataFrame(columns=[
+            "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
+            "jumlah uang pengeluaran", "Jenis Pemasukan",
+            "jumlah uang pemasukan", "Catatan", "RawDate"
+        ])
+
+df_database = load_data()
+status_sinkron = "☁️ Tersinkron" if "connections" in st.secrets else "⚠️ Belum Terhubung"
+
+# 4. Custom CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -144,7 +163,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 4. Warna Dinamis Tab Pemasukan vs Pengeluaran
+# 5. Warna Dinamis Tab Pemasukan vs Pengeluaran
 warna_tab_aktif = "#C8432B" if st.session_state.tipe == "Pengeluaran" else "#1B4332"
 st.markdown(f"""
 <style>
@@ -163,25 +182,25 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# 5. Header Atas dengan Jam Lokal HP
-components.html("""
+# 6. Header Atas dengan Jam Lokal HP & Status Sinkronisasi
+components.html(f"""
 <!DOCTYPE html>
 <html>
 <head>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-    body { background-color: transparent; }
-    .top-header {
+    * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }}
+    body {{ background-color: transparent; }}
+    .top-header {{
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
         padding: 0 20px 10px 20px;
         color: #2C302E;
-    }
-    .greeting-sub { font-size: 13px; color: #6B6D66; margin-bottom: 2px; font-weight: 500; }
-    .greeting-name { font-size: 20px; font-weight: 700; color: #1F2421; letter-spacing: -0.3px; }
-    .sync-badge {
+    }}
+    .greeting-sub {{ font-size: 13px; color: #6B6D66; margin-bottom: 2px; font-weight: 500; }}
+    .greeting-name {{ font-size: 20px; font-weight: 700; color: #1F2421; letter-spacing: -0.3px; }}
+    .sync-badge {{
         background-color: rgba(0, 0, 0, 0.05);
         color: #4A524E;
         padding: 5px 12px;
@@ -190,7 +209,7 @@ components.html("""
         font-weight: 500;
         margin-top: 6px;
         border: 1px solid rgba(0, 0, 0, 0.08);
-    }
+    }}
 </style>
 </head>
 <body>
@@ -199,17 +218,17 @@ components.html("""
             <div class="greeting-sub" id="ucapan">Selamat malam,</div>
             <div class="greeting-name">Panji & Feby</div>
         </div>
-        <div class="sync-badge">☁️ Tersinkron</div>
+        <div class="sync-badge">{status_sinkron}</div>
     </div>
     <script>
-        function updateGreeting() {
+        function updateGreeting() {{
             const jam = new Date().getHours();
             let teks = "Selamat malam,";
             if (jam >= 4 && jam < 11) teks = "Selamat pagi,";
             else if (jam >= 11 && jam < 15) teks = "Selamat siang,";
             else if (jam >= 15 && jam < 18) teks = "Selamat sore,";
             document.getElementById("ucapan").innerText = teks;
-        }
+        }}
         updateGreeting();
         setInterval(updateGreeting, 60000);
     </script>
@@ -217,7 +236,7 @@ components.html("""
 </html>
 """, height=68)
 
-# 6. Kontainer Utama
+# 7. Kontainer Utama
 with st.container(border=True):
     st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
     st.markdown('<div class="card-title">Catat transaksi</div>', unsafe_allow_html=True)
@@ -248,7 +267,7 @@ with st.container(border=True):
             st.session_state.buka_pilih_kategori = False
             st.rerun()
 
-    # --- Input Nominal (Rp) menggunakan key dinamis agar bisa di-reset ---
+    # --- Input Nominal (Rp) ---
     st.markdown('<div class="field-label">Nominal (Rp)</div>', unsafe_allow_html=True)
     nominal = st.number_input(
         "Nominal",
@@ -275,7 +294,7 @@ with st.container(border=True):
             ]
         else:
             baris_kategori = [
-                [("🥗", "Makan/Jajan"), ("🧸", "Kebutuhan Anak")],
+                [("🥗", "Makan & Dapur"), ("🧸", "Kebutuhan Anak")],
                 [("🎒", "Pendidikan Anak"), ("🏠", "Cicilan"), ("💡", "Listrik, Air & Iuran")],
                 [("👨‍👩‍👧", "Keluarga (Adik/Uti)"), ("⛽", "Transportasi & BBM")],
                 [("📶", "Pulsa & Internet"), ("💊", "Kesehatan")],
@@ -317,7 +336,7 @@ with st.container(border=True):
                 st.session_state.dibayar_oleh = pembayar
                 st.rerun()
 
-    # --- Tanggal & Catatan menggunakan key dinamis ---
+    # --- Tanggal & Catatan ---
     col_tgl, col_cat = st.columns(2, gap="small")
     with col_tgl:
         st.markdown('<div class="field-label">Tanggal</div>', unsafe_allow_html=True)
@@ -339,7 +358,7 @@ with st.container(border=True):
             key=f"input_catatan_{st.session_state.form_key}"
         )
 
-    # --- Tombol Simpan Transaksi ---
+    # --- Tombol Simpan Transaksi ke Google Sheets ---
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
     if st.button("Simpan Transaksi", type="primary", use_container_width=True):
         if nominal > 0 and st.session_state.kategori != "Pilih Kategori...":
@@ -353,8 +372,7 @@ with st.container(border=True):
             jns_pemasukan = st.session_state.kategori if st.session_state.tipe == "Pemasukan" else ""
             jml_pemasukan = nominal if st.session_state.tipe == "Pemasukan" else 0
 
-            # Catatan bisa ditambahkan ke format jika diperlukan, atau disimpan
-            data_baru = {
+            data_baru = pd.DataFrame([{
                 "Nama": st.session_state.dibayar_oleh,
                 "Hari tanggal bulan tahun": format_tgl_lengkap,
                 "Jenis Pengeluaran": jns_pengeluaran,
@@ -362,26 +380,38 @@ with st.container(border=True):
                 "Jenis Pemasukan": jns_pemasukan,
                 "jumlah uang pemasukan": jml_pemasukan,
                 "Catatan": catatan,
-                "RawDate": pd.to_datetime(tanggal)
-            }
+                "RawDate": tanggal.strftime("%Y-%m-%d")
+            }])
 
-            st.session_state.database_transaksi.append(data_baru)
-            st.success(f"Berhasil menyimpan {st.session_state.tipe} sebesar Rp {nominal:,}!")
-            
-            # Reset form dengan mengubah form_key dan mengembalikan kategori ke default
-            st.session_state.form_key += 1
-            st.session_state.kategori = "Pilih Kategori..."
-            st.rerun()
+            try:
+                # Gabungkan data lama dari Google Sheets dengan data baru, lalu update
+                df_updated = pd.concat([df_database, data_baru], ignore_index=True)
+                conn.update(worksheet="Sheet1", data=df_updated)
+                
+                st.success(f"Tersimpan ke Google Sheets: {st.session_state.tipe} Rp {nominal:,}!")
+                
+                # Kosongkan form input
+                st.session_state.form_key += 1
+                st.session_state.kategori = "Pilih Kategori..."
+                st.rerun()
+            except Exception as e:
+                st.error(f"Gagal menyimpan ke Google Sheets. Pastikan konfigurasi Secrets sudah benar. Detail: {e}")
         else:
             st.warning("Pastikan nominal sudah diisi dan kategori sudah dipilih.")
 
-    # --- Bagian Download Laporan Excel ---
+    # --- Bagian Download Laporan Excel (Menarik data dari Google Sheets) ---
     st.markdown("<hr style='margin: 24px 0 16px 0; border: 0; border-top: 1px solid #EAE7DD;'>", unsafe_allow_html=True)
     st.markdown('<div class="card-title" style="font-size: 17px;">Download Laporan Excel</div>', unsafe_allow_html=True)
 
-    if len(st.session_state.database_transaksi) > 0:
-        df_all = pd.DataFrame(st.session_state.database_transaksi)
-        tipe_laporan = st.selectbox("Pilih Periode Laporan", ["Harian", "Mingguan", "Bulanan (Siklus Gajian Panji - tgl 26)", "Bulanan (Siklus Gajian Feby - tgl 28)", "Semua Data"])
+    if not df_database.empty and "RawDate" in df_database.columns:
+        df_all = df_database.copy()
+        df_all["RawDate"] = pd.to_datetime(df_all["RawDate"], errors="coerce")
+        df_all = df_all.dropna(subset=["RawDate"])
+
+        tipe_laporan = st.selectbox(
+            "Pilih Periode Laporan", 
+            ["Harian", "Mingguan", "Bulanan (Siklus Gajian Panji - tgl 26)", "Bulanan (Siklus Gajian Feby - tgl 28)", "Semua Data"]
+        )
         
         df_filtered = df_all.copy()
         sekarang = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).normalize().tz_localize(None)
@@ -441,4 +471,4 @@ with st.container(border=True):
         else:
             st.info(f"Tidak ada data transaksi untuk periode **{tipe_laporan}**.")
     else:
-        st.caption("Belum ada transaksi yang disubmit. Data yang dimasukkan akan muncul di sini untuk diunduh.")
+        st.caption("Belum ada data di Google Sheets atau koneksi belum diatur.")
