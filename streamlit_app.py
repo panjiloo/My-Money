@@ -1,10 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import io
+import requests
 
 # 1. Konfigurasi Halaman
 st.set_page_config(
@@ -13,6 +13,9 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="collapsed"
 )
+
+# URL Web App Google Apps Script Anda
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwqn9gHoy2ucq237Lr-0mevxh_7anpTPHym4r3IG1jChXvIY4RK-I9VfaEfYHbE00M2/exec"
 
 # 2. Inisialisasi Session State
 if "tipe" not in st.session_state:
@@ -26,28 +29,7 @@ if "dibayar_oleh" not in st.session_state:
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
 
-# 3. Koneksi ke Google Sheets
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-# Fungsi mengambil data dari Google Sheets
-def load_data():
-    try:
-        df = conn.read(worksheet="Sheet1", ttl=0)
-        # Hapus baris kosong jika ada
-        df = df.dropna(how="all")
-        return df
-    except Exception:
-        # Jika sheet masih benar-benar kosong atau belum ada header
-        return pd.DataFrame(columns=[
-            "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
-            "jumlah uang pengeluaran", "Jenis Pemasukan",
-            "jumlah uang pemasukan", "Catatan", "RawDate"
-        ])
-
-df_database = load_data()
-status_sinkron = "☁️ Tersinkron" if "connections" in st.secrets else "⚠️ Belum Terhubung"
-
-# 4. Custom CSS
+# 3. Custom CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -163,7 +145,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 5. Warna Dinamis Tab Pemasukan vs Pengeluaran
+# 4. Warna Dinamis Tab Pemasukan vs Pengeluaran
 warna_tab_aktif = "#C8432B" if st.session_state.tipe == "Pengeluaran" else "#1B4332"
 st.markdown(f"""
 <style>
@@ -182,25 +164,25 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# 6. Header Atas dengan Jam Lokal HP & Status Sinkronisasi
-components.html(f"""
+# 5. Header Atas dengan Jam Lokal HP
+components.html("""
 <!DOCTYPE html>
 <html>
 <head>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-    * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }}
-    body {{ background-color: transparent; }}
-    .top-header {{
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background-color: transparent; }
+    .top-header {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
         padding: 0 20px 10px 20px;
         color: #2C302E;
-    }}
-    .greeting-sub {{ font-size: 13px; color: #6B6D66; margin-bottom: 2px; font-weight: 500; }}
-    .greeting-name {{ font-size: 20px; font-weight: 700; color: #1F2421; letter-spacing: -0.3px; }}
-    .sync-badge {{
+    }
+    .greeting-sub { font-size: 13px; color: #6B6D66; margin-bottom: 2px; font-weight: 500; }
+    .greeting-name { font-size: 20px; font-weight: 700; color: #1F2421; letter-spacing: -0.3px; }
+    .sync-badge {
         background-color: rgba(0, 0, 0, 0.05);
         color: #4A524E;
         padding: 5px 12px;
@@ -209,7 +191,7 @@ components.html(f"""
         font-weight: 500;
         margin-top: 6px;
         border: 1px solid rgba(0, 0, 0, 0.08);
-    }}
+    }
 </style>
 </head>
 <body>
@@ -218,17 +200,17 @@ components.html(f"""
             <div class="greeting-sub" id="ucapan">Selamat malam,</div>
             <div class="greeting-name">Panji & Feby</div>
         </div>
-        <div class="sync-badge">{status_sinkron}</div>
+        <div class="sync-badge">☁️ Tersinkron</div>
     </div>
     <script>
-        function updateGreeting() {{
+        function updateGreeting() {
             const jam = new Date().getHours();
             let teks = "Selamat malam,";
             if (jam >= 4 && jam < 11) teks = "Selamat pagi,";
             else if (jam >= 11 && jam < 15) teks = "Selamat siang,";
             else if (jam >= 15 && jam < 18) teks = "Selamat sore,";
             document.getElementById("ucapan").innerText = teks;
-        }}
+        }
         updateGreeting();
         setInterval(updateGreeting, 60000);
     </script>
@@ -236,7 +218,7 @@ components.html(f"""
 </html>
 """, height=68)
 
-# 7. Kontainer Utama
+# 6. Kontainer Utama
 with st.container(border=True):
     st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
     st.markdown('<div class="card-title">Catat transaksi</div>', unsafe_allow_html=True)
@@ -294,7 +276,7 @@ with st.container(border=True):
             ]
         else:
             baris_kategori = [
-                [("🥗", "Makan & Jajan"), ("🧸", "Kebutuhan Anak")],
+                [("🥗", "Makan & Dapur"), ("🧸", "Kebutuhan Anak")],
                 [("🎒", "Pendidikan Anak"), ("🏠", "Cicilan"), ("💡", "Listrik, Air & Iuran")],
                 [("👨‍👩‍👧", "Keluarga (Adik/Uti)"), ("⛽", "Transportasi & BBM")],
                 [("📶", "Pulsa & Internet"), ("💊", "Kesehatan")],
@@ -358,7 +340,7 @@ with st.container(border=True):
             key=f"input_catatan_{st.session_state.form_key}"
         )
 
-    # --- Tombol Simpan Transaksi ke Google Sheets ---
+    # --- Tombol Simpan Transaksi (Kirim ke Google Sheets via Web App) ---
     st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
     if st.button("Simpan Transaksi", type="primary", use_container_width=True):
         if nominal > 0 and st.session_state.kategori != "Pilih Kategori...":
@@ -372,103 +354,114 @@ with st.container(border=True):
             jns_pemasukan = st.session_state.kategori if st.session_state.tipe == "Pemasukan" else ""
             jml_pemasukan = nominal if st.session_state.tipe == "Pemasukan" else 0
 
-            data_baru = pd.DataFrame([{
+            payload = {
                 "Nama": st.session_state.dibayar_oleh,
-                "Hari tanggal bulan tahun": format_tgl_lengkap,
-                "Jenis Pengeluaran": jns_pengeluaran,
-                "jumlah uang pengeluaran": jml_pengeluaran,
-                "Jenis Pemasukan": jns_pemasukan,
-                "jumlah uang pemasukan": jml_pemasukan,
+                "Hari_tanggal_bulan_tahun": format_tgl_lengkap,
+                "Jenis_Pengeluaran": jns_pengeluaran,
+                "Jumlah_Uang_Pengeluaran": jml_pengeluaran,
+                "Jenis_Pemasukan": jns_pemasukan,
+                "Jumlah_Uang_Pemasukan": jml_pemasukan,
                 "Catatan": catatan,
                 "RawDate": tanggal.strftime("%Y-%m-%d")
-            }])
+            }
 
             try:
-                # Gabungkan data lama dari Google Sheets dengan data baru, lalu update
-                df_updated = pd.concat([df_database, data_baru], ignore_index=True)
-                conn.update(worksheet="Sheet1", data=df_updated)
-                
-                st.success(f"Tersimpan ke Google Sheets: {st.session_state.tipe} Rp {nominal:,}!")
-                
-                # Kosongkan form input
-                st.session_state.form_key += 1
-                st.session_state.kategori = "Pilih Kategori..."
-                st.rerun()
+                response = requests.post(WEB_APP_URL, json=payload)
+                if response.status_code == 200:
+                    st.success(f"Berhasil tersimpan ke Google Sheets: {st.session_state.tipe} Rp {nominal:,}!")
+                    # Kosongkan form input
+                    st.session_state.form_key += 1
+                    st.session_state.kategori = "Pilih Kategori..."
+                    st.rerun()
+                else:
+                    st.error("Gagal mengirim data ke Google Sheets.")
             except Exception as e:
-                st.error(f"Gagal menyimpan ke Google Sheets. Pastikan konfigurasi Secrets sudah benar. Detail: {e}")
+                st.error(f"Terjadi kesalahan koneksi: {e}")
         else:
             st.warning("Pastikan nominal sudah diisi dan kategori sudah dipilih.")
 
-    # --- Bagian Download Laporan Excel (Menarik data dari Google Sheets) ---
+    # --- Bagian Download Laporan Excel ---
     st.markdown("<hr style='margin: 24px 0 16px 0; border: 0; border-top: 1px solid #EAE7DD;'>", unsafe_allow_html=True)
     st.markdown('<div class="card-title" style="font-size: 17px;">Download Laporan Excel</div>', unsafe_allow_html=True)
 
-    if not df_database.empty and "RawDate" in df_database.columns:
-        df_all = df_database.copy()
-        df_all["RawDate"] = pd.to_datetime(df_all["RawDate"], errors="coerce")
-        df_all = df_all.dropna(subset=["RawDate"])
+    # Membaca data langsung dari Google Sheets untuk keperluan download laporan
+    @st.cache_data(ttl=5)
+    def load_data_from_sheet(sheet_url):
+        try:
+            csv_url = sheet_url.replace('/edit?usp=sharing', '/export?format=csv&gid=0').replace('/edit', '/export?format=csv&gid=0')
+            df = pd.read_csv(csv_url)
+            return df
+        except Exception:
+            return pd.DataFrame()
 
-        tipe_laporan = st.selectbox(
-            "Pilih Periode Laporan", 
-            ["Harian", "Mingguan", "Bulanan (Siklus Gajian Panji - tgl 26)", "Bulanan (Siklus Gajian Feby - tgl 28)", "Semua Data"]
-        )
-        
-        df_filtered = df_all.copy()
-        sekarang = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).normalize().tz_localize(None)
+    df_database = load_data_from_sheet(WEB_APP_URL.replace("/exec", "/edit")) # atau gunakan URL share Google Sheets Anda
 
-        if tipe_laporan == "Harian":
-            df_filtered = df_all[df_all["RawDate"] == sekarang]
-            
-        elif tipe_laporan == "Mingguan":
-            satu_minggu_lalu = sekarang - pd.Timedelta(days=7)
-            df_filtered = df_all[(df_all["RawDate"] >= satu_minggu_lalu) & (df_all["RawDate"] <= sekarang)]
-            
-        elif "Bulanan" in tipe_laporan:
-            tgl_gaji = 26 if "Panji" in tipe_laporan else 28
-            tahun_skrg = sekarang.year
-            bulan_skrg = sekarang.month
-            
-            try:
-                mulai_bln_ini = pd.Timestamp(year=tahun_skrg, month=bulan_skrg, day=tgl_gaji)
-            except ValueError:
-                mulai_bln_ini = pd.Timestamp(year=tahun_skrg, month=bulan_skrg, day=1) + pd.offsets.MonthEnd(0)
+    # Alternatif pembacaan CSV langsung dari link Google Sheets publik/share
+    link_csv_sheets = st.text_input("Link CSV Google Sheets (Opsional untuk unduh laporan):", value="", placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv")
+    
+    if link_csv_sheets:
+        try:
+            df_all = pd.read_csv(link_csv_sheets)
+            df_all["RawDate"] = pd.to_datetime(df_all["RawDate"], errors="coerce")
+            df_all = df_all.dropna(subset=["RawDate"])
 
-            if sekarang >= mulai_bln_ini:
-                tgl_mulai = mulai_bln_ini
-                tgl_selesai = (tgl_mulai + pd.DateOffset(months=1)) - pd.Timedelta(days=1)
+            tipe_laporan = st.selectbox("Pilih Periode Laporan", ["Harian", "Mingguan", "Bulanan (Siklus Gajian Panji - tgl 26)", "Bulanan (Siklus Gajian Feby - tgl 28)", "Semua Data"])
+            
+            df_filtered = df_all.copy()
+            sekarang = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).normalize().tz_localize(None)
+
+            if tipe_laporan == "Harian":
+                df_filtered = df_all[df_all["RawDate"] == sekarang]
+            elif tipe_laporan == "Mingguan":
+                satu_minggu_lalu = sekarang - pd.Timedelta(days=7)
+                df_filtered = df_all[(df_all["RawDate"] >= satu_minggu_lalu) & (df_all["RawDate"] <= sekarang)]
+            elif "Bulanan" in tipe_laporan:
+                tgl_gaji = 26 if "Panji" in tipe_laporan else 28
+                tahun_skrg = sekarang.year
+                bulan_skrg = sekarang.month
+                
+                try:
+                    mulai_bln_ini = pd.Timestamp(year=tahun_skrg, month=bulan_skrg, day=tgl_gaji)
+                except ValueError:
+                    mulai_bln_ini = pd.Timestamp(year=tahun_skrg, month=bulan_skrg, day=1) + pd.offsets.MonthEnd(0)
+
+                if sekarang >= mulai_bln_ini:
+                    tgl_mulai = mulai_bln_ini
+                    tgl_selesai = (tgl_mulai + pd.DateOffset(months=1)) - pd.Timedelta(days=1)
+                else:
+                    tgl_selesai = mulai_bln_ini - pd.Timedelta(days=1)
+                    tgl_mulai = (tgl_selesai - pd.DateOffset(months=1)) + pd.Timedelta(days=1)
+
+                df_filtered = df_all[(df_all["RawDate"] >= tgl_mulai) & (df_all["RawDate"] <= tgl_selesai)]
+
+            if not df_filtered.empty:
+                df_export = df_filtered[[
+                    "Nama", 
+                    "Hari tanggal bulan tahun", 
+                    "Jenis Pengeluaran", 
+                    "jumlah uang pengeluaran", 
+                    "Jenis Pemasukan", 
+                    "jumlah uang pemasukan"
+                ]].rename(columns={
+                    "jumlah uang pengeluaran": "jumlah uang",
+                    "jumlah uang pemasukan": "jumlah uang"
+                })
+                
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_export.to_excel(writer, index=False, sheet_name='Laporan Keuangan')
+                excel_data = output.getvalue()
+
+                st.download_button(
+                    label=f"📥 Download Excel ({tipe_laporan})",
+                    data=excel_data,
+                    file_name=f"Laporan_Keuangan_{tipe_laporan.lower().replace(' ', '_').replace('(', '').replace(')', '')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
             else:
-                tgl_selesai = mulai_bln_ini - pd.Timedelta(days=1)
-                tgl_mulai = (tgl_selesai - pd.DateOffset(months=1)) + pd.Timedelta(days=1)
-
-            df_filtered = df_all[(df_all["RawDate"] >= tgl_mulai) & (df_all["RawDate"] <= tgl_selesai)]
-            st.caption(f"Siklus Periode ({'Panji' if tgl_gaji==26 else 'Feby'}): **{tgl_mulai.strftime('%d %b %Y')} s.d. {tgl_selesai.strftime('%d %b %Y')}**")
-
-        if not df_filtered.empty:
-            df_export = df_filtered[[
-                "Nama", 
-                "Hari tanggal bulan tahun", 
-                "Jenis Pengeluaran", 
-                "jumlah uang pengeluaran", 
-                "Jenis Pemasukan", 
-                "jumlah uang pemasukan"
-            ]].rename(columns={
-                "jumlah uang pengeluaran": "jumlah uang",
-                "jumlah uang pemasukan": "jumlah uang"
-            })
-            
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_export.to_excel(writer, index=False, sheet_name='Laporan Keuangan')
-            excel_data = output.getvalue()
-
-            st.download_button(
-                label=f"📥 Download Excel ({tipe_laporan})",
-                data=excel_data,
-                file_name=f"Laporan_Keuangan_{tipe_laporan.lower().replace(' ', '_').replace('(', '').replace(')', '')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-        else:
-            st.info(f"Tidak ada data transaksi untuk periode **{tipe_laporan}**.")
+                st.info(f"Tidak ada data transaksi untuk periode **{tipe_laporan}**.")
+        except Exception:
+            st.caption("Masukkan link export CSV Google Sheets dengan benar untuk mengaktifkan unduhan laporan.")
     else:
-        st.caption("Belum ada data di Google Sheets atau koneksi belum diatur.")
+            st.caption("Masukkan link CSV Spreadsheet di atas untuk mulai mendownload laporan berdasarkan data Google Sheets.")
