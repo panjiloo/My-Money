@@ -527,13 +527,15 @@ else:
 banner_data_uri = _muat_banner_data_uri()
 salam_awal = _salam_waktu_wib()
 
-# Styling khusus saat kolom tanggal di Entry masih kosong & transparan
+# Kotak tanggal di Entry punya background & border sama seperti kolom Catatan,
+# namun isi teks/ikonnya dibuat transparan saat belum dipilih agar tampak kosong
 if st.session_state.halaman == "Entry" and st.session_state.tanggal_kosong:
     css_date_empty = """
     div[data-testid="stDateInput"] > div > div {
-        background-color: transparent !important;
-        border: 1.2px solid transparent !important;
-        box-shadow: none !important;
+        background-color: var(--bg-input-soft) !important;
+        border: 1.2px solid var(--border-soft) !important;
+        border-radius: 12px !important;
+        height: 44px !important;
     }
     div[data-testid="stDateInput"] input,
     div[data-testid="stDateInput"] span,
@@ -552,12 +554,16 @@ else:
     div[data-testid="stDateInput"] > div > div {
         background-color: var(--bg-input-soft) !important;
         border: 1.2px solid var(--border-soft) !important;
+        border-radius: 12px !important;
+        height: 44px !important;
     }
     div[data-testid="stDateInput"] input,
     div[data-testid="stDateInput"] span,
     div[data-testid="stDateInput"] div {
         color: #000000 !important;
         -webkit-text-fill-color: #000000 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
     }
     """
 
