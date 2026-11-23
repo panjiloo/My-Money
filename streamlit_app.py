@@ -1,5 +1,7 @@
+import base64
 import io
 import json
+from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -17,6 +19,16 @@ st.set_page_config(
 
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwqn9gHoy2ucq237Lr-0mevxh_7anpTPHym4r3IG1jChXvIY4RK-I9VfaEfYHbE00M2/exec"
 DASHBOARD_PASSWORD = "febbycantik123"
+
+BASE_DIR = Path(__file__).resolve().parent
+KANDIDAT_GAMBAR = [
+    BASE_DIR / "kimi.jpeg",
+    BASE_DIR / "kimi.jpg",
+    BASE_DIR / "assets" / "kimi.jpeg",
+    BASE_DIR / "assets" / "kimi.jpg",
+    BASE_DIR / "images" / "kimi.jpeg",
+    BASE_DIR / "images" / "kimi.jpg",
+]
 
 KATEGORI_PEMASUKAN = ["Gaji", "Suami", "Istri", "Ortu", "Saudara", "Investasi"]
 KATEGORI_PENGELUARAN = [
@@ -94,6 +106,17 @@ if "filter_nama_dash" not in st.session_state:
     st.session_state.filter_nama_dash = "Semua"
 if "edit_counter" not in st.session_state:
     st.session_state.edit_counter = 0
+
+def _muat_banner_data_uri():
+    for kandidat in KANDIDAT_GAMBAR:
+        try:
+            if kandidat.exists() and kandidat.is_file():
+                mime = "image/png" if kandidat.suffix.lower() == ".png" else "image/jpeg"
+                encoded = base64.b64encode(kandidat.read_bytes()).decode("ascii")
+                return f"data:{mime};base64,{encoded}"
+        except Exception:
+            continue
+    return ""
 
 def _bersihkan_angka_rp(val):
     if val is None or val == "":
@@ -491,6 +514,8 @@ else:
     border_soft = "#EAE7DD"
     placeholder_color = "#7A7D75"
 
+banner_data_uri = _muat_banner_data_uri()
+
 # 4. Custom CSS
 st.markdown(f"""
 <style>
@@ -511,12 +536,34 @@ st.markdown(f"""
 
     .block-container {{
         max-width: 440px !important;
-        padding: 1.2rem 0 0 0 !important;
+        padding: 0.9rem 0 0 0 !important;
         margin: 0 auto !important;
     }}
 
     iframe[title="streamlit_components_v1.html_v1"] {{
         margin-bottom: -10px !important;
+    }}
+
+    .top-header-photo-wrap {{
+        padding: 0 12px 10px 12px;
+    }}
+
+    .top-header-photo {{
+        width: 100%;
+        height: 156px;
+        border-radius: 22px;
+        overflow: hidden;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        background: linear-gradient(135deg, #162447 0%, #1F4068 55%, #E43F5A 100%);
+    }}
+
+    .top-header-photo img {{
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center 45%;
+        display: block;
     }}
 
     div[data-testid="stVerticalBlockBorderWrapper"] {{
@@ -840,59 +887,29 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# 5. Header Atas dengan Jam Lokal HP
-components.html("""
-<!DOCTYPE html>
-<html>
-<head>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-    body { background-color: transparent; }
-    .top-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        padding: 0 20px 10px 20px;
-        color: #2C302E;
-    }
-    .greeting-sub { font-size: 13px; color: #6B6D66; margin-bottom: 2px; font-weight: 500; }
-    .greeting-name { font-size: 20px; font-weight: 700; color: #1F2421; letter-spacing: -0.3px; }
-    .sync-badge {
-        background-color: rgba(0, 0, 0, 0.05);
-        color: #4A524E;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-        margin-top: 6px;
-        border: 1px solid rgba(0, 0, 0, 0.08);
-    }
-</style>
-</head>
-<body>
-    <div class="top-header">
-        <div>
-            <div class="greeting-sub" id="ucapan">Selamat malam,</div>
-            <div class="greeting-name">Panji & Febby</div>
+# 5. Header Atas dengan Foto ke-2 (kimi.jpeg)
+if banner_data_uri:
+    st.markdown(
+        f"""
+        <div class="top-header-photo-wrap">
+            <div class="top-header-photo">
+                <img src="{banner_data_uri}" alt="Header Banner">
+            </div>
         </div>
-        <div class="sync-badge">☁️ Tersinkron</div>
-    </div>
-    <script>
-        function updateGreeting() {
-            const jam = new Date().getHours();
-            let teks = "Selamat malam,";
-            if (jam >= 4 && jam < 11) teks = "Selamat pagi,";
-            else if (jam >= 11 && jam < 15) teks = "Selamat siang,";
-            else if (jam >= 15 && jam < 18) teks = "Selamat sore,";
-            document.getElementById("ucapan").innerText = teks;
-        }
-        updateGreeting();
-        setInterval(updateGreeting, 60000);
-    </script>
-</body>
-</html>
-""", height=68)
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.markdown(
+        """
+        <div class="top-header-photo-wrap">
+            <div class="top-header-photo" style="display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-size:12.5px;font-weight:600;padding:12px;text-align:center;">
+                Simpan file <b>kimi.jpeg</b> di folder yang sama dengan aplikasi untuk menampilkan foto header.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # 6. Kontainer Utama
 with st.container(border=True):
@@ -961,7 +978,6 @@ with st.container(border=True):
             unsafe_allow_html=True
         )
 
-        # Icon mata untuk hide/unhide nominal bulan ini
         label_mata = "👁️ Tampilkan Nominal" if is_hidden else "🙈 Sembunyikan Nominal"
         if st.button(label_mata, key="btn_toggle_mata_home", use_container_width=True, type="secondary"):
             st.session_state.hide_home_nominal = not st.session_state.hide_home_nominal
@@ -969,7 +985,6 @@ with st.container(border=True):
 
         st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
 
-        # Aksi cepat 1-klik: hanya memunculkan opsi sesuai jenis yang dipilih
         c_q1, c_q2 = st.columns(2, gap="small")
         with c_q1:
             if st.button("↑ Catat Pengeluaran", key="home_quick_out", type="primary", use_container_width=True):
@@ -1655,4 +1670,3 @@ with st.container(border=True):
                             st.error(f"Terjadi kesalahan koneksi saat update: {e}")
                 else:
                     st.info(f"Tidak ada transaksi pada periode **{periode_aktif}** ({nama_aktif}) untuk diedit.")
-
