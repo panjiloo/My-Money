@@ -555,6 +555,106 @@ st.markdown(f"""
         margin-bottom: 6px;
     }}
 
+    .home-hero {{
+        background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%);
+        color: #FFFFFF;
+        border-radius: 20px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 8px 20px rgba(27, 67, 50, 0.16);
+    }}
+
+    .home-hero-top {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        opacity: 0.9;
+        font-weight: 600;
+        margin-bottom: 6px;
+    }}
+
+    .home-saldo-label {{
+        font-size: 12.5px;
+        opacity: 0.88;
+        font-weight: 500;
+    }}
+
+    .home-saldo-val {{
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        margin: 2px 0 12px 0;
+    }}
+
+    .home-mini-grid {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }}
+
+    .home-mini-card {{
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 12px;
+        padding: 8px 10px;
+    }}
+
+    .home-mini-label {{
+        font-size: 11px;
+        opacity: 0.88;
+        font-weight: 500;
+    }}
+
+    .home-mini-val {{
+        font-size: 13.5px;
+        font-weight: 700;
+        margin-top: 2px;
+    }}
+
+    .trx-item {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #F8F7F4;
+        border: 1px solid #EAE7DD;
+        border-radius: 14px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        transition: transform 0.15s ease, border-color 0.15s ease;
+    }}
+
+    .trx-item:hover {{
+        transform: translateY(-1px);
+        border-color: #C9C4B6;
+    }}
+
+    .trx-title {{
+        font-size: 13px;
+        font-weight: 700;
+        color: #1F2421;
+    }}
+
+    .trx-sub {{
+        font-size: 11.5px;
+        color: #6B6D66;
+        margin-top: 2px;
+    }}
+
+    .trx-amt-in {{
+        font-size: 13px;
+        font-weight: 700;
+        color: #1B4332;
+        text-align: right;
+    }}
+
+    .trx-amt-out {{
+        font-size: 13px;
+        font-weight: 700;
+        color: #C8432B;
+        text-align: right;
+    }}
+
     .summary-box {{
         background-color: #F8F7F4;
         border: 1px solid #EAE7DD;
@@ -806,20 +906,105 @@ with st.container(border=True):
     st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
 
     # =========================================================
-    # HALAMAN 1: HOME
+    # HALAMAN 1: HOME (INTERAKTIF & RINGKAS)
     # =========================================================
     if st.session_state.halaman == "Home":
-        st.markdown('<div class="card-title">Home</div>', unsafe_allow_html=True)
+        df_home_raw = ambil_data_sheets(WEB_APP_URL)
+        sekarang_home = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).tz_localize(None).normalize()
+        awal_bulan_home = sekarang_home.replace(day=1)
 
-        if st.button("✍️ Entry", key="home_go_entry", type="primary", use_container_width=True):
-            st.session_state.halaman = "Entry"
-            st.rerun()
+        if not df_home_raw.empty and "ParsedDate" in df_home_raw.columns:
+            df_home_bulanan = df_home_raw[
+                df_home_raw["ParsedDate"].notna() &
+                (df_home_raw["ParsedDate"] >= awal_bulan_home) &
+                (df_home_raw["ParsedDate"] <= sekarang_home)
+            ]
+        else:
+            df_home_bulanan = pd.DataFrame()
 
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        in_bulan_home = float(df_home_bulanan["jumlah uang pemasukan"].sum()) if not df_home_bulanan.empty else 0.0
+        out_bulan_home = float(df_home_bulanan["jumlah uang pengeluaran"].sum()) if not df_home_bulanan.empty else 0.0
+        saldo_bulan_home = in_bulan_home - out_bulan_home
 
-        if st.button("📊 Dashboard", key="home_go_dash", type="secondary", use_container_width=True):
+        st.markdown(
+            f"""
+            <div class="home-hero">
+                <div class="home-hero-top">
+                    <span>✨ Ringkasan {sekarang_home.strftime("%B %Y")}</span>
+                    <span>Panji & Febby</span>
+                </div>
+                <div class="home-saldo-label">Saldo Bersih Bulan Ini</div>
+                <div class="home-saldo-val">{format_rp(saldo_bulan_home)}</div>
+                <div class="home-mini-grid">
+                    <div class="home-mini-card">
+                        <div class="home-mini-label">↓ Pemasukan</div>
+                        <div class="home-mini-val">{format_rp(in_bulan_home)}</div>
+                    </div>
+                    <div class="home-mini-card">
+                        <div class="home-mini-label">↑ Pengeluaran</div>
+                        <div class="home-mini-val">{format_rp(out_bulan_home)}</div>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # Aksi cepat 1-klik
+        c_q1, c_q2 = st.columns(2, gap="small")
+        with c_q1:
+            if st.button("↑ Catat Pengeluaran", key="home_quick_out", type="primary", use_container_width=True):
+                st.session_state.halaman = "Entry"
+                st.session_state.tipe = "Pengeluaran"
+                st.session_state.kategori = "Kategori"
+                st.session_state.buka_pilih_kategori = False
+                st.rerun()
+        with c_q2:
+            if st.button("↓ Catat Pemasukan", key="home_quick_in", type="secondary", use_container_width=True):
+                st.session_state.halaman = "Entry"
+                st.session_state.tipe = "Pemasukan"
+                st.session_state.kategori = "Kategori"
+                st.session_state.buka_pilih_kategori = False
+                st.rerun()
+
+        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+
+        if st.button("📊 Buka Dashboard Lengkap", key="home_go_dash", type="secondary", use_container_width=True):
             st.session_state.halaman = "Dashboard"
             st.rerun()
+
+        st.markdown('<div class="sub-title">🕒 Transaksi Terakhir</div>', unsafe_allow_html=True)
+
+        if not df_home_raw.empty:
+            df_recent = df_home_raw.sort_values(
+                by=["ParsedDate", "_rowNumber"],
+                ascending=[False, False],
+                na_position="last"
+            ).head(3)
+
+            for _, r in df_recent.iterrows():
+                is_in = float(r["jumlah uang pemasukan"]) > 0
+                kat_lbl = r["Jenis Pemasukan"] if is_in else (r["Jenis Pengeluaran"] or "Lainnya")
+                nom_val = float(r["jumlah uang pemasukan"]) if is_in else float(r["jumlah uang pengeluaran"])
+                tgl_lbl = r["ParsedDate"].strftime("%d %b") if pd.notna(r["ParsedDate"]) else r["RawDate"]
+                cat_lbl = f" • {r['Catatan']}" if str(r["Catatan"]).strip() else ""
+                kelas_amt = "trx-amt-in" if is_in else "trx-amt-out"
+                tanda_amt = "+" if is_in else "-"
+
+                st.markdown(
+                    f"""
+                    <div class="trx-item">
+                        <div>
+                            <div class="trx-title">{kat_lbl}</div>
+                            <div class="trx-sub">{tgl_lbl} • {r["Nama"] or "Bersama"}{cat_lbl}</div>
+                        </div>
+                        <div class="{kelas_amt}">{tanda_amt} {format_rp(nom_val)}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        else:
+            st.caption("Belum ada transaksi tercatat. Klik **Catat Pengeluaran** atau **Catat Pemasukan** di atas untuk mulai.")
 
     # =========================================================
     # HALAMAN 2: ENTRY
@@ -868,7 +1053,6 @@ with st.container(border=True):
             st.session_state[nominal_key] = nominal_terformat
             st.rerun()
 
-        # Auto-format titik ribuan langsung saat mengetik di browser
         components.html(f"""
         <script>
         (function() {{
