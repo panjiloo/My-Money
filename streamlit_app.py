@@ -57,6 +57,7 @@ IKON_PENGELUARAN = {
 }
 OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 OPSI_FILTER_NAMA = ["Semua", "Panji", "Febby", "Bersama"]
+OPSI_PERIODE = ["Hari", "Minggu", "Bulan", "Semester", "Tahun", "Semua"]
 
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
@@ -67,6 +68,8 @@ if "buka_menu_edit" not in st.session_state:
     st.session_state.buka_menu_edit = False
 if "buka_menu_download" not in st.session_state:
     st.session_state.buka_menu_download = False
+if "buka_menu_periode" not in st.session_state:
+    st.session_state.buka_menu_periode = True
 if "tipe" not in st.session_state:
     st.session_state.tipe = "Pengeluaran"
 if "kategori" not in st.session_state:
@@ -78,7 +81,9 @@ if "dibayar_oleh" not in st.session_state:
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
 if "periode_dash" not in st.session_state:
-    st.session_state.periode_dash = "Bulanan"
+    st.session_state.periode_dash = "Bulan"
+if "tanggal_hari_dash" not in st.session_state:
+    st.session_state.tanggal_hari_dash = datetime.now(ZoneInfo("Asia/Jakarta")).date()
 if "filter_nama_dash" not in st.session_state:
     st.session_state.filter_nama_dash = "Semua"
 if "edit_counter" not in st.session_state:
@@ -546,12 +551,12 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
-    .download-panel {{
+    .download-panel, .periode-panel {{
         background-color: #F8F7F4;
         border: 1px solid #EAE7DD;
         border-radius: 16px;
-        padding: 14px;
-        margin-top: 10px;
+        padding: 12px;
+        margin-top: 8px;
         margin-bottom: 10px;
     }}
 
@@ -977,18 +982,57 @@ with st.container(border=True):
                     st.session_state.buka_menu_download = False
                     st.rerun()
 
-            opsi_periode = ["Harian", "Mingguan", "Bulanan", "Kuartal", "Semua"]
-            cols_p = st.columns(5, gap="small")
-            for idx, p in enumerate(opsi_periode):
-                with cols_p[idx]:
-                    if st.button(
-                        p,
-                        key=f"periode_{p}",
-                        use_container_width=True,
-                        type="primary" if st.session_state.periode_dash == p else "secondary"
-                    ):
-                        st.session_state.periode_dash = p
-                        st.rerun()
+            # Icon / Tombol Periode -> memunculkan pilihan Hari, Minggu, Bulan, Semester, Tahun, Semua
+            if st.button(
+                f"🗓️ Periode: {st.session_state.periode_dash}",
+                key="toggle_menu_periode",
+                type="primary" if st.session_state.buka_menu_periode else "secondary",
+                use_container_width=True
+            ):
+                st.session_state.buka_menu_periode = not st.session_state.buka_menu_periode
+                st.rerun()
+
+            if st.session_state.buka_menu_periode:
+                st.markdown('<div class="periode-panel">', unsafe_allow_html=True)
+                cols_p1 = st.columns(3, gap="small")
+                for idx, p in enumerate(OPSI_PERIODE[:3]):
+                    with cols_p1[idx]:
+                        if st.button(
+                            p,
+                            key=f"periode_{p}",
+                            use_container_width=True,
+                            type="primary" if st.session_state.periode_dash == p else "secondary"
+                        ):
+                            st.session_state.periode_dash = p
+                            st.rerun()
+
+                st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+
+                cols_p2 = st.columns(3, gap="small")
+                for idx, p in enumerate(OPSI_PERIODE[3:]):
+                    with cols_p2[idx]:
+                        if st.button(
+                            p,
+                            key=f"periode_{p}",
+                            use_container_width=True,
+                            type="primary" if st.session_state.periode_dash == p else "secondary"
+                        ):
+                            st.session_state.periode_dash = p
+                            st.rerun()
+
+                # Saat memilih menu Hari -> muncul kalender untuk memilih tanggal
+                if st.session_state.periode_dash == "Hari":
+                    st.markdown('<div class="field-label" style="margin-top: 10px;">📅 Pilih Tanggal</div>', unsafe_allow_html=True)
+                    tgl_pilihan_hari = st.date_input(
+                        "Pilih Tanggal",
+                        value=st.session_state.tanggal_hari_dash,
+                        format="DD/MM/YYYY",
+                        label_visibility="collapsed",
+                        key="kalender_periode_hari"
+                    )
+                    st.session_state.tanggal_hari_dash = tgl_pilihan_hari
+
+                st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown('<div class="field-label" style="margin-top: 10px;">Filter Nama</div>', unsafe_allow_html=True)
             cols_n = st.columns(4, gap="small")
@@ -1016,15 +1060,14 @@ with st.container(border=True):
                     parsed = parsed.dt.tz_localize(None)
                 df_valid["ParsedDate"] = parsed.dt.normalize()
 
-                if periode_aktif == "Harian":
-                    tgl_awal = sekarang_ts
-                    label_rentang = sekarang_ts.strftime("%d %b %Y")
+                if periode_aktif == "Hari":
+                    tgl_target = pd.Timestamp(st.session_state.tanggal_hari_dash).tz_localize(None).normalize()
+                    label_rentang = tgl_target.strftime("%d %b %Y")
                     df_filtered = df_valid[
                         df_valid["ParsedDate"].notna() &
-                        (df_valid["ParsedDate"] >= tgl_awal) &
-                        (df_valid["ParsedDate"] <= sekarang_ts)
+                        (df_valid["ParsedDate"] == tgl_target)
                     ].copy()
-                elif periode_aktif == "Mingguan":
+                elif periode_aktif == "Minggu":
                     tgl_awal = sekarang_ts - pd.Timedelta(days=6)
                     label_rentang = f"{tgl_awal.strftime('%d %b')} - {sekarang_ts.strftime('%d %b %Y')}"
                     df_filtered = df_valid[
@@ -1032,7 +1075,7 @@ with st.container(border=True):
                         (df_valid["ParsedDate"] >= tgl_awal) &
                         (df_valid["ParsedDate"] <= sekarang_ts)
                     ].copy()
-                elif periode_aktif == "Bulanan":
+                elif periode_aktif == "Bulan":
                     tgl_awal = sekarang_ts.replace(day=1)
                     label_rentang = sekarang_ts.strftime("%B %Y")
                     df_filtered = df_valid[
@@ -1040,9 +1083,19 @@ with st.container(border=True):
                         (df_valid["ParsedDate"] >= tgl_awal) &
                         (df_valid["ParsedDate"] <= sekarang_ts)
                     ].copy()
-                elif periode_aktif == "Kuartal":
-                    tgl_awal = (sekarang_ts.replace(day=1) - pd.DateOffset(months=2)).tz_localize(None).normalize()
+                elif periode_aktif == "Semester":
+                    # Semester 1: Jan-Jun (mulai 1 Jan), Semester 2: Jul-Des (mulai 1 Jul)
+                    bulan_awal_sem = 1 if sekarang_ts.month <= 6 else 7
+                    tgl_awal = sekarang_ts.replace(month=bulan_awal_sem, day=1)
                     label_rentang = f"{tgl_awal.strftime('%b %Y')} - {sekarang_ts.strftime('%b %Y')}"
+                    df_filtered = df_valid[
+                        df_valid["ParsedDate"].notna() &
+                        (df_valid["ParsedDate"] >= tgl_awal) &
+                        (df_valid["ParsedDate"] <= sekarang_ts)
+                    ].copy()
+                elif periode_aktif == "Tahun":
+                    tgl_awal = sekarang_ts.replace(month=1, day=1)
+                    label_rentang = sekarang_ts.strftime("Tahun %Y")
                     df_filtered = df_valid[
                         df_valid["ParsedDate"].notna() &
                         (df_valid["ParsedDate"] >= tgl_awal) &
