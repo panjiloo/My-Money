@@ -114,12 +114,14 @@ if is_tema_merah:
     aksen_gelap = "#9E2A1C"
     bg_input_soft = "#FFF7F5"
     border_soft = "#F2D5CF"
+    placeholder_color = "#9E5A4E"
 else:
     bg_app = "#F4F2EA"
     aksen_utama = "#1B4332"
     aksen_gelap = "#133024"
     bg_input_soft = "#F8F7F4"
     border_soft = "#EAE7DD"
+    placeholder_color = "#7A7D75"
 
 # 4. Custom CSS
 st.markdown(f"""
@@ -265,6 +267,10 @@ st.markdown(f"""
         padding: 10px 14px !important;
         height: 52px !important;
     }}
+    div[data-testid="stNumberInput"] input::placeholder {{
+        color: {placeholder_color} !important;
+        opacity: 1 !important;
+    }}
     div[data-testid="stNumberInput"] button {{
         display: none !important;
     }}
@@ -306,17 +312,31 @@ st.markdown(f"""
     div[data-testid="stDateInput"] > div > div,
     div[data-testid="stTextInput"] > div > div {{
         background-color: {bg_input_soft} !important;
-        border: 1px solid {border_soft} !important;
+        border: 1.2px solid {border_soft} !important;
         border-radius: 12px !important;
         height: 44px !important;
+    }}
+
+    div[data-testid="stDateInput"] > div > div:focus-within,
+    div[data-testid="stTextInput"] > div > div:focus-within {{
+        border-color: {aksen_utama} !important;
     }}
 
     div[data-testid="stDateInput"] input,
     div[data-testid="stTextInput"] input {{
         color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         font-weight: 600 !important;
         font-size: 14px !important;
         background-color: transparent !important;
+    }}
+
+    div[data-testid="stTextInput"] input::placeholder,
+    div[data-testid="stDateInput"] input::placeholder {{
+        color: {placeholder_color} !important;
+        -webkit-text-fill-color: {placeholder_color} !important;
+        font-weight: 500 !important;
+        opacity: 1 !important;
     }}
 </style>
 """, unsafe_allow_html=True)
