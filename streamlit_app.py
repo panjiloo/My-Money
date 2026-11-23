@@ -21,21 +21,40 @@ DASHBOARD_PASSWORD = "febbycantik123"
 KATEGORI_PEMASUKAN = ["Gaji", "Suami", "Istri", "Ortu", "Saudara", "Investasi"]
 KATEGORI_PENGELUARAN = [
     "Makan & Jajan",
+    "Listrik & Air",
+    "Pulsa & Internet",
+    "Transport & BBM",
+    "Belanja Bulanan/ Rumah Tangga",
+    "Tabungan",
+    "Kesehatan",
+    "Hiburan",
+    "Sedekah & Sosial",
+    "Iuran",
+    "Investasi",
+    "Keluarga",
     "Kebutuhan Anak",
     "Pendidikan Anak",
     "Cicilan",
-    "Listrik, Air & Iuran",
-    "Keluarga (Adik/Ortu/Saudara)",
-    "Transportasi & BBM",
-    "Pulsa & Internet",
-    "Kesehatan",
-    "Belanja Rumah Tangga",
-    "Sedekah & Sosial",
-    "Hiburan & Jajan",
-    "Tabungan",
-    "Investasi",
     "Lainnya"
 ]
+IKON_PENGELUARAN = {
+    "Makan & Jajan": "🥗",
+    "Listrik & Air": "💡",
+    "Pulsa & Internet": "📶",
+    "Transport & BBM": "⛽",
+    "Belanja Bulanan/ Rumah Tangga": "🧺",
+    "Tabungan": "🐷",
+    "Kesehatan": "💊",
+    "Hiburan": "🍦",
+    "Sedekah & Sosial": "🤲",
+    "Iuran": "🧾",
+    "Investasi": "📈",
+    "Keluarga": "👨‍👩‍👧",
+    "Kebutuhan Anak": "🧸",
+    "Pendidikan Anak": "🎒",
+    "Cicilan": "🏠",
+    "Lainnya": "📦"
+}
 OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 OPSI_FILTER_NAMA = ["Semua", "Panji", "Febby", "Bersama"]
 
@@ -72,7 +91,6 @@ def _bersihkan_angka_rp(val):
         return float(val) if pd.notna(val) else 0.0
     s = str(val).strip()
     s = s.replace("Rp", "").replace("rp", "").replace(" ", "")
-    # Tangani format ribuan titik Indonesia (misal 50.000 -> 50000) atau koma desimal
     if "." in s and "," in s:
         s = s.replace(".", "").replace(",", ".")
     elif "." in s:
@@ -150,7 +168,6 @@ def ambil_data_sheets(url):
                     df[target_col] = ""
 
             parsed_raw = pd.to_datetime(df["RawDate"], errors="coerce")
-            # Jika RawDate kosong/gagal diparse, coba ambil dari kolom Tanggal atau Hari tanggal bulan tahun
             if parsed_raw.isna().any():
                 col_tgl_alt = _cari_kolom(df, ["Tanggal", "Hari tanggal bulan tahun", "Hari_tanggal_bulan_tahun"])
                 if col_tgl_alt:
@@ -176,10 +193,18 @@ def format_tgl_indo(tgl_date):
     ][tgl_date.month - 1]
     return f"{nama_hari}, {tgl_date.day} {bulan_str} {tgl_date.year}"
 
-def render_donut_chart(labels, values, colors, chart_id="donutChart", height=245):
+def render_donut_with_side_stats(labels, values, colors, chart_id="donutChart", height=250):
+    clean_vals = [float(v) for v in values]
+    total_val = sum(clean_vals)
+    formatted_rp_list = [format_rp(v) for v in clean_vals]
+    pct_list = [f"{(v / total_val * 100):.1f}%" if total_val > 0 else "0.0%" for v in clean_vals]
+
     payload_labels = json.dumps(labels)
-    payload_values = json.dumps([float(v) for v in values])
+    payload_values = json.dumps(clean_vals)
     payload_colors = json.dumps(colors)
+    payload_rp = json.dumps(formatted_rp_list)
+    payload_pct = json.dumps(pct_list)
+
     components.html(f"""
     <!DOCTYPE html>
     <html>
@@ -189,61 +214,137 @@ def render_donut_chart(labels, values, colors, chart_id="donutChart", height=245
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
             * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }}
-            body {{ background: transparent; display: flex; justify-content: center; align-items: center; }}
-            .chart-wrap {{
+            body {{ background: transparent; }}
+            .card-donut-side {{
                 width: 100%;
-                max-width: 380px;
                 background: #F8F7F4;
                 border: 1px solid #EAE7DD;
                 border-radius: 16px;
                 padding: 12px;
-                height: {height - 16}px;
                 display: flex;
-                justify-content: center;
+                flex-direction: row;
                 align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                min-height: {height - 14}px;
+            }}
+            .canvas-box {{
+                width: 145px;
+                height: 145px;
+                flex: 0 0 145px;
+                position: relative;
+            }}
+            .stats-side {{
+                flex: 1;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 7px;
+                max-height: {height - 38}px;
+                overflow-y: auto;
+                padding-right: 2px;
+            }}
+            .stat-item {{
+                background: #FFFFFF;
+                border: 1px solid #EAE7DD;
+                border-radius: 10px;
+                padding: 6px 8px;
+            }}
+            .stat-top {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 6px;
+                font-size: 11.5px;
+                font-weight: 700;
+                color: #1F2421;
+            }}
+            .stat-left {{
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                min-width: 0;
+            }}
+            .dot {{
+                width: 9px;
+                height: 9px;
+                border-radius: 50%;
+                flex-shrink: 0;
+            }}
+            .stat-name {{
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }}
+            .stat-pct {{
+                color: #1F2421;
+                font-weight: 700;
+                flex-shrink: 0;
+            }}
+            .stat-rp {{
+                font-size: 11.5px;
+                font-weight: 600;
+                color: #4A524E;
+                margin-top: 2px;
+                padding-left: 15px;
             }}
         </style>
     </head>
     <body>
-        <div class="chart-wrap">
-            <canvas id="{chart_id}"></canvas>
+        <div class="card-donut-side">
+            <div class="canvas-box">
+                <canvas id="{chart_id}"></canvas>
+            </div>
+            <div class="stats-side" id="{chart_id}_stats"></div>
         </div>
         <script>
+            const labels = {payload_labels};
+            const values = {payload_values};
+            const colors = {payload_colors};
+            const rpList = {payload_rp};
+            const pctList = {payload_pct};
+
+            const statsContainer = document.getElementById('{chart_id}_stats');
+            labels.forEach((lbl, idx) => {{
+                const item = document.createElement('div');
+                item.className = 'stat-item';
+                item.innerHTML = `
+                    <div class="stat-top">
+                        <div class="stat-left">
+                            <span class="dot" style="background-color: ${{colors[idx] || '#1B4332'}};"></span>
+                            <span class="stat-name" title="${{lbl}}">${{lbl}}</span>
+                        </div>
+                        <span class="stat-pct">${{pctList[idx]}}</span>
+                    </div>
+                    <div class="stat-rp">${{rpList[idx]}}</div>
+                `;
+                statsContainer.appendChild(item);
+            }});
+
             const ctx = document.getElementById('{chart_id}').getContext('2d');
             new Chart(ctx, {{
                 type: 'doughnut',
                 data: {{
-                    labels: {payload_labels},
+                    labels: labels,
                     datasets: [{{
-                        data: {payload_values},
-                        backgroundColor: {payload_colors},
+                        data: values,
+                        backgroundColor: colors,
                         borderColor: '#FFFFFF',
                         borderWidth: 2,
-                        hoverOffset: 6
+                        hoverOffset: 4
                     }}]
                 }},
                 options: {{
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '56%',
+                    cutout: '58%',
                     plugins: {{
-                        legend: {{
-                            position: 'bottom',
-                            labels: {{
-                                color: '#1F2421',
-                                font: {{ family: 'Plus Jakarta Sans', size: 11, weight: '600' }},
-                                boxWidth: 12,
-                                padding: 10
-                            }}
-                        }},
+                        legend: {{ display: false }},
                         tooltip: {{
                             callbacks: {{
                                 label: function(context) {{
-                                    const val = Number(context.raw || 0);
-                                    const total = context.dataset.data.reduce((a, b) => a + Number(b || 0), 0);
-                                    const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
-                                    const formatted = 'Rp ' + Math.round(val).toString().replace(/\\B(?=(\\d{{3}})+(?!\\d))/g, '.');
-                                    return ' ' + context.label + ': ' + formatted + ' (' + pct + '%)';
+                                    const idx = context.dataIndex;
+                                    return ' ' + labels[idx] + ': ' + rpList[idx] + ' (' + pctList[idx] + ')';
                                 }}
                             }}
                         }}
@@ -748,13 +849,8 @@ with st.container(border=True):
                 ]
             else:
                 baris_kategori = [
-                    [("🥗", "Makan & Jajan"), ("🧸", "Kebutuhan Anak")],
-                    [("🎒", "Pendidikan Anak"), ("🏠", "Cicilan"), ("💡", "Listrik, Air & Iuran")],
-                    [("👨‍👩‍👧", "Keluarga (Adik/Ortu/Saudara)"), ("⛽", "Transportasi & BBM")],
-                    [("📶", "Pulsa & Internet"), ("💊", "Kesehatan")],
-                    [("🧺", "Belanja Rumah Tangga"), ("🤲", "Sedekah & Sosial")],
-                    [("🍦", "Hiburan & Jajan"), ("🐷", "Tabungan"), ("📈", "Investasi")],
-                    [("📦", "Lainnya")]
+                    [(IKON_PENGELUARAN[k], k) for k in KATEGORI_PENGELUARAN[i:i + 2]]
+                    for i in range(0, len(KATEGORI_PENGELUARAN), 2)
                 ]
 
             for idx_row, row in enumerate(baris_kategori):
@@ -990,12 +1086,12 @@ with st.container(border=True):
             )
 
             st.markdown('<div class="sub-title">1. Pengeluaran vs Pemasukan</div>', unsafe_allow_html=True)
-            render_donut_chart(
+            render_donut_with_side_stats(
                 labels=["Pemasukan", "Pengeluaran"],
                 values=[total_pemasukan, total_pengeluaran],
                 colors=["#1B4332", "#C8432B"],
                 chart_id="chartVsInOut",
-                height=235
+                height=210
             )
 
             st.markdown('<div class="sub-title">2. Major Expense</div>', unsafe_allow_html=True)
@@ -1016,12 +1112,13 @@ with st.container(border=True):
                 ]
                 donut_colors = [palette_donut[i % len(palette_donut)] for i in range(len(rekap_kat))]
 
-                render_donut_chart(
+                tinggi_box_major = min(max(210, len(rekap_kat) * 54 + 28), 340)
+                render_donut_with_side_stats(
                     labels=rekap_kat["Kategori"].tolist(),
                     values=rekap_kat["jumlah uang pengeluaran"].tolist(),
                     colors=donut_colors,
                     chart_id="chartMajorExpense",
-                    height=265
+                    height=tinggi_box_major
                 )
 
                 for _, row in rekap_kat.iterrows():
