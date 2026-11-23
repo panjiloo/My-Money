@@ -62,6 +62,10 @@ OPSI_PERIODE = ["Hari", "Minggu", "Bulan", "Semester", "Tahun", "Semua"]
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
     st.session_state.halaman = "Home"  # "Home", "Entry", "Dashboard"
+if "entry_mode_terkunci" not in st.session_state:
+    st.session_state.entry_mode_terkunci = False
+if "hide_home_nominal" not in st.session_state:
+    st.session_state.hide_home_nominal = True
 if "dashboard_unlocked" not in st.session_state:
     st.session_state.dashboard_unlocked = False
 if "buka_menu_edit" not in st.session_state:
@@ -560,7 +564,7 @@ st.markdown(f"""
         color: #FFFFFF;
         border-radius: 20px;
         padding: 16px;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         box-shadow: 0 8px 20px rgba(27, 67, 50, 0.16);
     }}
 
@@ -897,10 +901,12 @@ with st.container(border=True):
     if st.session_state.halaman == "Home":
         if st.button("🏠 Home", key="nav_home", use_container_width=True, type="primary"):
             st.session_state.halaman = "Home"
+            st.session_state.entry_mode_terkunci = False
             st.rerun()
     else:
         if st.button("🏠 Kembali ke Home", key="nav_back_home", use_container_width=True, type="secondary"):
             st.session_state.halaman = "Home"
+            st.session_state.entry_mode_terkunci = False
             st.rerun()
 
     st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
@@ -926,6 +932,11 @@ with st.container(border=True):
         out_bulan_home = float(df_home_bulanan["jumlah uang pengeluaran"].sum()) if not df_home_bulanan.empty else 0.0
         saldo_bulan_home = in_bulan_home - out_bulan_home
 
+        is_hidden = st.session_state.hide_home_nominal
+        tampil_saldo = "****" if is_hidden else format_rp(saldo_bulan_home)
+        tampil_in = "****" if is_hidden else format_rp(in_bulan_home)
+        tampil_out = "****" if is_hidden else format_rp(out_bulan_home)
+
         st.markdown(
             f"""
             <div class="home-hero">
@@ -934,15 +945,15 @@ with st.container(border=True):
                     <span>Panji & Febby</span>
                 </div>
                 <div class="home-saldo-label">Saldo Bersih Bulan Ini</div>
-                <div class="home-saldo-val">{format_rp(saldo_bulan_home)}</div>
+                <div class="home-saldo-val">{tampil_saldo}</div>
                 <div class="home-mini-grid">
                     <div class="home-mini-card">
                         <div class="home-mini-label">↓ Pemasukan</div>
-                        <div class="home-mini-val">{format_rp(in_bulan_home)}</div>
+                        <div class="home-mini-val">{tampil_in}</div>
                     </div>
                     <div class="home-mini-card">
                         <div class="home-mini-label">↑ Pengeluaran</div>
-                        <div class="home-mini-val">{format_rp(out_bulan_home)}</div>
+                        <div class="home-mini-val">{tampil_out}</div>
                     </div>
                 </div>
             </div>
@@ -950,21 +961,31 @@ with st.container(border=True):
             unsafe_allow_html=True
         )
 
-        # Aksi cepat 1-klik
+        # Icon mata untuk hide/unhide nominal bulan ini
+        label_mata = "👁️ Tampilkan Nominal" if is_hidden else "🙈 Sembunyikan Nominal"
+        if st.button(label_mata, key="btn_toggle_mata_home", use_container_width=True, type="secondary"):
+            st.session_state.hide_home_nominal = not st.session_state.hide_home_nominal
+            st.rerun()
+
+        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+
+        # Aksi cepat 1-klik: hanya memunculkan opsi sesuai jenis yang dipilih
         c_q1, c_q2 = st.columns(2, gap="small")
         with c_q1:
             if st.button("↑ Catat Pengeluaran", key="home_quick_out", type="primary", use_container_width=True):
                 st.session_state.halaman = "Entry"
                 st.session_state.tipe = "Pengeluaran"
+                st.session_state.entry_mode_terkunci = True
                 st.session_state.kategori = "Kategori"
-                st.session_state.buka_pilih_kategori = False
+                st.session_state.buka_pilih_kategori = True
                 st.rerun()
         with c_q2:
             if st.button("↓ Catat Pemasukan", key="home_quick_in", type="secondary", use_container_width=True):
                 st.session_state.halaman = "Entry"
                 st.session_state.tipe = "Pemasukan"
+                st.session_state.entry_mode_terkunci = True
                 st.session_state.kategori = "Kategori"
-                st.session_state.buka_pilih_kategori = False
+                st.session_state.buka_pilih_kategori = True
                 st.rerun()
 
         st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
@@ -1010,32 +1031,38 @@ with st.container(border=True):
     # HALAMAN 2: ENTRY
     # =========================================================
     elif st.session_state.halaman == "Entry":
-        st.markdown('<div class="card-title">Entry</div>', unsafe_allow_html=True)
+        judul_entry = (
+            "Catat Pengeluaran"
+            if (st.session_state.entry_mode_terkunci and st.session_state.tipe == "Pengeluaran")
+            else ("Catat Pemasukan" if st.session_state.entry_mode_terkunci else "Entry")
+        )
+        st.markdown(f'<div class="card-title">{judul_entry}</div>', unsafe_allow_html=True)
 
-        col_in, col_out = st.columns(2, gap="small")
-        with col_in:
-            if st.button(
-                "↓ Pemasukan",
-                key="btn_in",
-                use_container_width=True,
-                type="primary" if st.session_state.tipe == "Pemasukan" else "secondary"
-            ):
-                st.session_state.tipe = "Pemasukan"
-                st.session_state.kategori = "Kategori"
-                st.session_state.buka_pilih_kategori = False
-                st.rerun()
+        if not st.session_state.entry_mode_terkunci:
+            col_in, col_out = st.columns(2, gap="small")
+            with col_in:
+                if st.button(
+                    "↓ Pemasukan",
+                    key="btn_in",
+                    use_container_width=True,
+                    type="primary" if st.session_state.tipe == "Pemasukan" else "secondary"
+                ):
+                    st.session_state.tipe = "Pemasukan"
+                    st.session_state.kategori = "Kategori"
+                    st.session_state.buka_pilih_kategori = False
+                    st.rerun()
 
-        with col_out:
-            if st.button(
-                "↑ Pengeluaran",
-                key="btn_out",
-                use_container_width=True,
-                type="primary" if st.session_state.tipe == "Pengeluaran" else "secondary"
-            ):
-                st.session_state.tipe = "Pengeluaran"
-                st.session_state.kategori = "Kategori"
-                st.session_state.buka_pilih_kategori = False
-                st.rerun()
+            with col_out:
+                if st.button(
+                    "↑ Pengeluaran",
+                    key="btn_out",
+                    use_container_width=True,
+                    type="primary" if st.session_state.tipe == "Pengeluaran" else "secondary"
+                ):
+                    st.session_state.tipe = "Pengeluaran"
+                    st.session_state.kategori = "Kategori"
+                    st.session_state.buka_pilih_kategori = False
+                    st.rerun()
 
         st.markdown('<div class="field-label">Nominal (Rp)</div>', unsafe_allow_html=True)
         nominal_key = f"input_nominal_{st.session_state.form_key}"
