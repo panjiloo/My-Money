@@ -118,6 +118,16 @@ def _muat_banner_data_uri():
             continue
     return ""
 
+def _salam_waktu_wib():
+    jam = datetime.now(ZoneInfo("Asia/Jakarta")).hour
+    if 4 <= jam < 11:
+        return "Selamat pagi,"
+    if 11 <= jam < 15:
+        return "Selamat siang,"
+    if 15 <= jam < 18:
+        return "Selamat sore,"
+    return "Selamat malam,"
+
 def _bersihkan_angka_rp(val):
     if val is None or val == "":
         return 0.0
@@ -515,6 +525,7 @@ else:
     placeholder_color = "#7A7D75"
 
 banner_data_uri = _muat_banner_data_uri()
+salam_awal = _salam_waktu_wib()
 
 # 4. Custom CSS
 st.markdown(f"""
@@ -564,6 +575,40 @@ st.markdown(f"""
         object-fit: cover;
         object-position: center 45%;
         display: block;
+    }}
+
+    .greeting-strip {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 2px 2px 6px 2px;
+        gap: 10px;
+    }}
+
+    .greeting-sub {{
+        font-size: 13px;
+        color: #6B6D66;
+        margin-bottom: 1px;
+        font-weight: 500;
+    }}
+
+    .greeting-name {{
+        font-size: 20px;
+        font-weight: 700;
+        color: #1F2421;
+        letter-spacing: -0.3px;
+        line-height: 1.2;
+    }}
+
+    .sync-badge {{
+        background-color: rgba(0, 0, 0, 0.05);
+        color: #4A524E;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        white-space: nowrap;
     }}
 
     div[data-testid="stVerticalBlockBorderWrapper"] {{
@@ -916,17 +961,42 @@ with st.container(border=True):
     st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
 
     if st.session_state.halaman == "Home":
-        if st.button("🏠 Home", key="nav_home", use_container_width=True, type="primary"):
-            st.session_state.halaman = "Home"
-            st.session_state.entry_mode_terkunci = False
-            st.rerun()
+        st.markdown(
+            f"""
+            <div class="greeting-strip">
+                <div>
+                    <div class="greeting-sub" id="ucapan_waktu">{salam_awal}</div>
+                    <div class="greeting-name">Panji &amp; Febby</div>
+                </div>
+                <div class="sync-badge">☁️ Tersinkron</div>
+            </div>
+            <script>
+            (function() {{
+                function sinkronSalam() {{
+                    const doc = window.parent.document;
+                    const el = doc.getElementById("ucapan_waktu");
+                    if (!el) return;
+                    const jam = new Date().getHours();
+                    let teks = "Selamat malam,";
+                    if (jam >= 4 && jam < 11) teks = "Selamat pagi,";
+                    else if (jam >= 11 && jam < 15) teks = "Selamat siang,";
+                    else if (jam >= 15 && jam < 18) teks = "Selamat sore,";
+                    el.innerText = teks;
+                }}
+                sinkronSalam();
+                setInterval(sinkronSalam, 60000);
+            }})();
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
     else:
         if st.button("🏠 Kembali ke Home", key="nav_back_home", use_container_width=True, type="secondary"):
             st.session_state.halaman = "Home"
             st.session_state.entry_mode_terkunci = False
             st.rerun()
 
-    st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
+    st.markdown(f"<hr style='margin: 10px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
 
     # =========================================================
     # HALAMAN 1: HOME (INTERAKTIF & RINGKAS)
