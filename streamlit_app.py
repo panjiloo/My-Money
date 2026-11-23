@@ -379,34 +379,14 @@ components.html("""
 with st.container(border=True):
     st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
 
-    # Bar Navigasi Utama (Home / Catatan / Dashboard)
-    nav1, nav2, nav3 = st.columns(3, gap="small")
-    with nav1:
-        if st.button(
-            "🏠 Home",
-            key="nav_home",
-            use_container_width=True,
-            type="primary" if st.session_state.halaman == "Home" else "secondary"
-        ):
+    # Bar Navigasi Atas: hanya Home (atau Kembali ke Home saat di submenu)
+    if st.session_state.halaman == "Home":
+        if st.button("🏠 Home", key="nav_home", use_container_width=True, type="primary"):
             st.session_state.halaman = "Home"
             st.rerun()
-    with nav2:
-        if st.button(
-            "✍️ Catatan",
-            key="nav_catatan",
-            use_container_width=True,
-            type="primary" if st.session_state.halaman == "Catatan" else "secondary"
-        ):
-            st.session_state.halaman = "Catatan"
-            st.rerun()
-    with nav3:
-        if st.button(
-            "📊 Dashboard",
-            key="nav_dash",
-            use_container_width=True,
-            type="primary" if st.session_state.halaman == "Dashboard" else "secondary"
-        ):
-            st.session_state.halaman = "Dashboard"
+    else:
+        if st.button("🏠 Kembali ke Home", key="nav_back_home", use_container_width=True, type="secondary"):
+            st.session_state.halaman = "Home"
             st.rerun()
 
     st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
