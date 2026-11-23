@@ -80,6 +80,8 @@ if "dibayar_oleh" not in st.session_state:
     st.session_state.dibayar_oleh = "Bersama"
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
+if "tanggal_kosong" not in st.session_state:
+    st.session_state.tanggal_kosong = False
 if "periode_dash" not in st.session_state:
     st.session_state.periode_dash = "Bulan"
 if "tanggal_hari_dash" not in st.session_state:
@@ -110,6 +112,16 @@ def _bersihkan_angka_rp(val):
             s = s.replace(",", ".")
     num = pd.to_numeric(s, errors="coerce")
     return float(num) if pd.notna(num) else 0.0
+
+def _format_ribuan_input(teks_input):
+    if not teks_input:
+        return "", 0
+    digits = "".join(ch for ch in str(teks_input) if ch.isdigit())
+    if not digits:
+        return "", 0
+    angka = int(digits)
+    terformat = f"{angka:,}".replace(",", ".")
+    return terformat, angka
 
 def _cari_kolom(df, kandidat_nama):
     norm_map = {str(c).strip().lower().replace("_", " "): c for c in df.columns}
@@ -710,6 +722,17 @@ st.markdown(f"""
         font-weight: 500 !important;
         opacity: 1 !important;
     }}
+
+    .nominal-ribuan-box div[data-testid="stTextInput"] > div > div {{
+        background-color: {bg_input_soft} !important;
+        border: 1.8px solid {aksen_utama} !important;
+        border-radius: 14px !important;
+        height: 52px !important;
+    }}
+    .nominal-ribuan-box div[data-testid="stTextInput"] input {{
+        font-size: 20px !important;
+        font-weight: 700 !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -830,15 +853,49 @@ with st.container(border=True):
                 st.rerun()
 
         st.markdown('<div class="field-label">Nominal (Rp)</div>', unsafe_allow_html=True)
-        nominal = st.number_input(
+        nominal_key = f"input_nominal_{st.session_state.form_key}"
+        st.markdown('<div class="nominal-ribuan-box">', unsafe_allow_html=True)
+        raw_nominal_input = st.text_input(
             "Nominal",
-            min_value=0,
-            value=None,
-            step=1000,
             placeholder="0",
             label_visibility="collapsed",
-            key=f"input_nominal_{st.session_state.form_key}"
+            key=nominal_key
         )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        nominal_terformat, val_nominal = _format_ribuan_input(raw_nominal_input)
+        if nominal_terformat and nominal_terformat != raw_nominal_input:
+            st.session_state[nominal_key] = nominal_terformat
+            st.rerun()
+
+        # Auto-format titik ribuan langsung saat mengetik di browser
+        components.html(f"""
+        <script>
+        (function() {{
+            const doc = window.parent.document;
+            const inputs = doc.querySelectorAll('div[data-testid="stTextInput"] input');
+            for (const inp of inputs) {{
+                if (inp.placeholder === "0") {{
+                    inp.setAttribute("inputmode", "numeric");
+                    if (!inp.dataset.ribuanBound) {{
+                        inp.dataset.ribuanBound = "1";
+                        inp.addEventListener("input", function() {{
+                            const digits = this.value.replace(/[^0-9]/g, "");
+                            if (!digits) {{
+                                this.value = "";
+                                return;
+                            }}
+                            const formatted = Number(digits).toLocaleString("id-ID");
+                            if (this.value !== formatted) {{
+                                this.value = formatted;
+                            }}
+                        }});
+                    }}
+                }}
+            }}
+        }})();
+        </script>
+        """, height=0)
 
         st.markdown('<div class="field-label">Kategori</div>', unsafe_allow_html=True)
         label_tombol_kategori = f"**{st.session_state.kategori}**"
@@ -893,13 +950,17 @@ with st.container(border=True):
         with col_tgl:
             st.markdown('<div class="field-label">Tanggal</div>', unsafe_allow_html=True)
             hari_ini_wib = datetime.now(ZoneInfo("Asia/Jakarta")).date()
-            tanggal = st.date_input(
+            tgl_key = f"input_tgl_{st.session_state.form_key}"
+            tanggal_input = st.date_input(
                 "Tanggal",
-                value=hari_ini_wib,
+                value=None if st.session_state.tanggal_kosong else hari_ini_wib,
                 format="DD/MM/YYYY",
                 label_visibility="collapsed",
-                key=f"input_tgl_{st.session_state.form_key}"
+                key=tgl_key
             )
+            if tanggal_input is not None:
+                st.session_state.tanggal_kosong = False
+            tanggal_efektif = tanggal_input if tanggal_input is not None else hari_ini_wib
         with col_cat:
             st.markdown('<div class="field-label">Catatan</div>', unsafe_allow_html=True)
             placeholder_cat = "mis. honor rapat" if st.session_state.tipe == "Pemasukan" else "mis. belanja mingguan"
@@ -911,10 +972,9 @@ with st.container(border=True):
             )
 
         st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
-        val_nominal = nominal if nominal is not None else 0
         if st.button("Submit", type="primary", use_container_width=True):
             if val_nominal > 0 and st.session_state.kategori != "Kategori":
-                format_tgl_lengkap = format_tgl_indo(tanggal)
+                format_tgl_lengkap = format_tgl_indo(tanggal_efektif)
 
                 jns_pengeluaran = st.session_state.kategori if st.session_state.tipe == "Pengeluaran" else ""
                 jml_pengeluaran = val_nominal if st.session_state.tipe == "Pengeluaran" else 0
@@ -931,7 +991,7 @@ with st.container(border=True):
                     "Jenis_Pemasukan": jns_pemasukan,
                     "Jumlah_Uang_Pemasukan": jml_pemasukan,
                     "Catatan": catatan,
-                    "RawDate": tanggal.strftime("%Y-%m-%d")
+                    "RawDate": tanggal_efektif.strftime("%Y-%m-%d")
                 }
 
                 try:
@@ -941,6 +1001,7 @@ with st.container(border=True):
                         st.success(f"Berhasil tersimpan: {st.session_state.tipe} {format_rp(val_nominal)}!")
                         st.session_state.form_key += 1
                         st.session_state.kategori = "Kategori"
+                        st.session_state.tanggal_kosong = True
                         st.rerun()
                     else:
                         st.error("Gagal mengirim data ke Google Sheets.")
@@ -983,7 +1044,6 @@ with st.container(border=True):
                     st.session_state.buka_menu_periode = False
                     st.rerun()
 
-            # Icon / Tombol Periode -> muncul hanya saat diklik
             if st.button(
                 f"🗓️ Periode ({st.session_state.periode_dash})",
                 key="toggle_menu_periode",
