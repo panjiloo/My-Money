@@ -14,10 +14,33 @@ st.set_page_config(
 )
 
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwqn9gHoy2ucq237Lr-0mevxh_7anpTPHym4r3IG1jChXvIY4RK-I9VfaEfYHbE00M2/exec"
+DASHBOARD_PASSWORD = "febbycantik123"
+
+KATEGORI_PEMASUKAN = ["Gaji", "Suami", "Istri", "Ortu", "Saudara", "Investasi"]
+KATEGORI_PENGELUARAN = [
+    "Makan & Jajan",
+    "Kebutuhan Anak",
+    "Pendidikan Anak",
+    "Cicilan",
+    "Listrik, Air & Iuran",
+    "Keluarga (Adik/Ortu/Saudara)",
+    "Transportasi & BBM",
+    "Pulsa & Internet",
+    "Kesehatan",
+    "Belanja Rumah Tangga",
+    "Sedekah & Sosial",
+    "Hiburan & Jajan",
+    "Tabungan",
+    "Investasi",
+    "Lainnya"
+]
+OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
     st.session_state.halaman = "Home"  # "Home", "Catatan", "Dashboard"
+if "dashboard_unlocked" not in st.session_state:
+    st.session_state.dashboard_unlocked = False
 if "tipe" not in st.session_state:
     st.session_state.tipe = "Pengeluaran"
 if "kategori" not in st.session_state:
@@ -30,6 +53,8 @@ if "form_key" not in st.session_state:
     st.session_state.form_key = 0
 if "periode_dash" not in st.session_state:
     st.session_state.periode_dash = "Bulanan"
+if "edit_counter" not in st.session_state:
+    st.session_state.edit_counter = 0
 
 # 3. Fungsi Ambil & Bersihkan Data dari Google Sheets
 @st.cache_data(ttl=15)
@@ -40,31 +65,43 @@ def ambil_data_sheets(url):
             raw_json = resp.json()
             if not raw_json:
                 return pd.DataFrame(columns=[
-                    "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
+                    "_rowNumber", "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
                     "jumlah uang pengeluaran", "Jenis Pemasukan",
-                    "jumlah uang pemasukan", "Catatan", "RawDate"
+                    "jumlah uang pemasukan", "Catatan", "RawDate", "ParsedDate"
                 ])
             df = pd.DataFrame(raw_json)
+            if "_rowNumber" not in df.columns:
+                df["_rowNumber"] = range(2, len(df) + 2)
             for col in ["jumlah uang pengeluaran", "jumlah uang pemasukan"]:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
                 else:
                     df[col] = 0.0
-            if "RawDate" in df.columns:
-                df["ParsedDate"] = pd.to_datetime(df["RawDate"], errors="coerce")
-            else:
-                df["ParsedDate"] = pd.NaT
+            for col in ["Nama", "Jenis Pengeluaran", "Jenis Pemasukan", "Catatan", "RawDate"]:
+                if col not in df.columns:
+                    df[col] = ""
+                else:
+                    df[col] = df[col].fillna("").astype(str)
+            df["ParsedDate"] = pd.to_datetime(df["RawDate"], errors="coerce")
             return df
     except Exception:
         pass
     return pd.DataFrame(columns=[
-        "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
+        "_rowNumber", "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
         "jumlah uang pengeluaran", "Jenis Pemasukan",
         "jumlah uang pemasukan", "Catatan", "RawDate", "ParsedDate"
     ])
 
 def format_rp(angka):
     return f"Rp {int(round(angka)):,}".replace(",", ".")
+
+def format_tgl_indo(tgl_date):
+    nama_hari = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"][tgl_date.weekday()]
+    bulan_str = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ][tgl_date.month - 1]
+    return f"{nama_hari}, {tgl_date.day} {bulan_str} {tgl_date.year}"
 
 # 4. Custom CSS
 st.markdown("""
@@ -203,11 +240,11 @@ st.markdown("""
         background-color: #F8F7F4 !important;
         border: 1.8px solid #355E4B !important;
         border-radius: 14px !important;
-        font-size: 26px !important;
+        font-size: 20px !important;
         font-weight: 700 !important;
         color: #000000 !important;
-        padding: 12px 16px !important;
-        height: 58px !important;
+        padding: 10px 14px !important;
+        height: 52px !important;
     }
     div[data-testid="stNumberInput"] button {
         display: none !important;
@@ -248,7 +285,7 @@ st.markdown("""
         background-color: #F8F7F4 !important;
         border: 1px solid #EAE7DD !important;
         border-radius: 12px !important;
-        height: 46px !important;
+        height: 44px !important;
     }
 
     div[data-testid="stDateInput"] input,
@@ -353,7 +390,7 @@ with st.container(border=True):
 
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
-        st.markdown('<div class="summary-box"><b>📊 Menu Dashboard</b><br><span class="summary-label">Summary keuangan, filter harian/mingguan/bulanan/kuartal, serta diagram perbandingan & kategori pengeluaran terbesar.</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="summary-box"><b>🔒 Menu Dashboard</b><br><span class="summary-label">Summary keuangan, filter periode, diagram perbandingan & pengeluaran terbesar, serta edit data langsung ke Google Sheets.</span></div>', unsafe_allow_html=True)
         if st.button("Buka Menu Dashboard", key="go_dash", type="secondary", use_container_width=True):
             st.session_state.halaman = "Dashboard"
             st.rerun()
@@ -400,7 +437,6 @@ with st.container(border=True):
                 st.session_state.buka_pilih_kategori = False
                 st.rerun()
 
-        # Input Nominal (tanpa 0 bawaan agar langsung siap ketik)
         st.markdown('<div class="field-label">Nominal (Rp)</div>', unsafe_allow_html=True)
         nominal = st.number_input(
             "Nominal",
@@ -412,7 +448,6 @@ with st.container(border=True):
             key=f"input_nominal_{st.session_state.form_key}"
         )
 
-        # Tombol Kategori (font hitam & bold)
         st.markdown('<div class="field-label">Kategori</div>', unsafe_allow_html=True)
         label_tombol_kategori = f"**{st.session_state.kategori}**"
         if st.button(label_tombol_kategori, key="btn_buka_kategori", use_container_width=True):
@@ -451,13 +486,11 @@ with st.container(border=True):
                             st.session_state.buka_pilih_kategori = False
                             st.rerun()
 
-        # Dibayar / Diterima oleh
         label_subjek = "Diterima oleh" if st.session_state.tipe == "Pemasukan" else "Dibayar oleh"
         st.markdown(f'<div class="field-label">{label_subjek}</div>', unsafe_allow_html=True)
 
-        opsi_pembayar = ["Panji", "Febby", "Bersama"]
         cols_payer = st.columns(3, gap="small")
-        for idx, pembayar in enumerate(opsi_pembayar):
+        for idx, pembayar in enumerate(OPSI_NAMA):
             with cols_payer[idx]:
                 is_selected = (st.session_state.dibayar_oleh == pembayar)
                 if st.button(
@@ -469,7 +502,6 @@ with st.container(border=True):
                     st.session_state.dibayar_oleh = pembayar
                     st.rerun()
 
-        # Tanggal & Catatan
         col_tgl, col_cat = st.columns(2, gap="small")
         with col_tgl:
             st.markdown('<div class="field-label">Tanggal</div>', unsafe_allow_html=True)
@@ -491,14 +523,11 @@ with st.container(border=True):
                 key=f"input_catatan_{st.session_state.form_key}"
             )
 
-        # Tombol Submit
         st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
         val_nominal = nominal if nominal is not None else 0
         if st.button("Submit", type="primary", use_container_width=True):
             if val_nominal > 0 and st.session_state.kategori != "Kategori":
-                nama_hari = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"][tanggal.weekday()]
-                bulan_str = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"][tanggal.month - 1]
-                format_tgl_lengkap = f"{nama_hari}, {tanggal.day} {bulan_str} {tanggal.year}"
+                format_tgl_lengkap = format_tgl_indo(tanggal)
 
                 jns_pengeluaran = st.session_state.kategori if st.session_state.tipe == "Pengeluaran" else ""
                 jml_pengeluaran = val_nominal if st.session_state.tipe == "Pengeluaran" else 0
@@ -507,6 +536,7 @@ with st.container(border=True):
                 jml_pemasukan = val_nominal if st.session_state.tipe == "Pemasukan" else 0
 
                 payload = {
+                    "action": "create",
                     "Nama": st.session_state.dibayar_oleh,
                     "Hari_tanggal_bulan_tahun": format_tgl_lengkap,
                     "Jenis_Pengeluaran": jns_pengeluaran,
@@ -518,7 +548,7 @@ with st.container(border=True):
                 }
 
                 try:
-                    response = requests.post(WEB_APP_URL, json=payload)
+                    response = requests.post(WEB_APP_URL, json=payload, timeout=15)
                     if response.status_code == 200:
                         ambil_data_sheets.clear()
                         st.success(f"Berhasil tersimpan: {st.session_state.tipe} {format_rp(val_nominal)}!")
@@ -533,137 +563,92 @@ with st.container(border=True):
                 st.warning("Pastikan nominal sudah diisi dan kategori sudah dipilih.")
 
     # =========================================================
-    # HALAMAN 3: DASHBOARD
+    # HALAMAN 3: DASHBOARD (+ KATA SANDI & MENU EDIT DATA)
     # =========================================================
     elif st.session_state.halaman == "Dashboard":
-        col_jd, col_rf = st.columns([3, 1])
-        with col_jd:
-            st.markdown('<div class="card-title" style="margin-bottom:4px;">Dashboard</div>', unsafe_allow_html=True)
-        with col_rf:
-            if st.button("🔄", key="refresh_dash", use_container_width=True):
-                ambil_data_sheets.clear()
-                st.rerun()
+        if not st.session_state.dashboard_unlocked:
+            st.markdown('<div class="card-title">🔒 Kunci Dashboard</div>', unsafe_allow_html=True)
+            st.caption("Masukkan kata sandi untuk membuka menu Dashboard.")
 
-        # Filter Periode: Harian, Mingguan, Bulanan, Kuartal
-        opsi_periode = ["Harian", "Mingguan", "Bulanan", "Kuartal"]
-        cols_p = st.columns(4, gap="small")
-        for idx, p in enumerate(opsi_periode):
-            with cols_p[idx]:
-                if st.button(
-                    p,
-                    key=f"periode_{p}",
-                    use_container_width=True,
-                    type="primary" if st.session_state.periode_dash == p else "secondary"
-                ):
-                    st.session_state.periode_dash = p
+            with st.form("form_password_dashboard", clear_on_submit=False):
+                input_pw = st.text_input("Kata Sandi", type="password", placeholder="Masukkan kata sandi...")
+                submitted_pw = st.form_submit_button("Masuk Dashboard", type="primary", use_container_width=True)
+
+            if submitted_pw:
+                if input_pw == DASHBOARD_PASSWORD:
+                    st.session_state.dashboard_unlocked = True
+                    st.rerun()
+                else:
+                    st.error("Kata sandi salah. Silakan coba lagi.")
+        else:
+            col_jd, col_rf, col_lk = st.columns([2.4, 0.8, 0.8], gap="small")
+            with col_jd:
+                st.markdown('<div class="card-title" style="margin-bottom:4px;">Dashboard</div>', unsafe_allow_html=True)
+            with col_rf:
+                if st.button("🔄", key="refresh_dash", use_container_width=True):
+                    ambil_data_sheets.clear()
+                    st.rerun()
+            with col_lk:
+                if st.button("🔒", key="lock_dash", use_container_width=True):
+                    st.session_state.dashboard_unlocked = False
                     st.rerun()
 
-        df_raw = ambil_data_sheets(WEB_APP_URL)
+            # Filter Periode: Harian, Mingguan, Bulanan, Kuartal
+            opsi_periode = ["Harian", "Mingguan", "Bulanan", "Kuartal"]
+            cols_p = st.columns(4, gap="small")
+            for idx, p in enumerate(opsi_periode):
+                with cols_p[idx]:
+                    if st.button(
+                        p,
+                        key=f"periode_{p}",
+                        use_container_width=True,
+                        type="primary" if st.session_state.periode_dash == p else "secondary"
+                    ):
+                        st.session_state.periode_dash = p
+                        st.rerun()
 
-        # Samakan semua tanggal menjadi tz-naive (tanpa timezone) & dinormalisasi ke awal hari
-        sekarang_ts = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).tz_localize(None).normalize()
-        periode_aktif = st.session_state.periode_dash
+            df_raw = ambil_data_sheets(WEB_APP_URL)
 
-        if not df_raw.empty and "ParsedDate" in df_raw.columns:
-            df_valid = df_raw.copy()
-            parsed = pd.to_datetime(df_valid["ParsedDate"], errors="coerce")
-            if getattr(parsed.dt, "tz", None) is not None:
-                parsed = parsed.dt.tz_localize(None)
-            df_valid["ParsedDate"] = parsed.dt.normalize()
-            df_valid = df_valid.dropna(subset=["ParsedDate"])
+            sekarang_ts = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).tz_localize(None).normalize()
+            periode_aktif = st.session_state.periode_dash
 
-            if periode_aktif == "Harian":
-                tgl_awal = sekarang_ts
-                label_rentang = sekarang_ts.strftime("%d %b %Y")
-            elif periode_aktif == "Mingguan":
-                tgl_awal = sekarang_ts - pd.Timedelta(days=6)
-                label_rentang = f"{tgl_awal.strftime('%d %b')} - {sekarang_ts.strftime('%d %b %Y')}"
-            elif periode_aktif == "Bulanan":
-                tgl_awal = sekarang_ts.replace(day=1)
-                label_rentang = sekarang_ts.strftime("%B %Y")
-            else:  # Kuartal (3 bulan terakhir termasuk bulan ini)
-                tgl_awal = (sekarang_ts.replace(day=1) - pd.DateOffset(months=2)).tz_localize(None).normalize()
-                label_rentang = f"{tgl_awal.strftime('%b %Y')} - {sekarang_ts.strftime('%b %Y')}"
+            if not df_raw.empty and "ParsedDate" in df_raw.columns:
+                df_valid = df_raw.copy()
+                parsed = pd.to_datetime(df_valid["ParsedDate"], errors="coerce")
+                if getattr(parsed.dt, "tz", None) is not None:
+                    parsed = parsed.dt.tz_localize(None)
+                df_valid["ParsedDate"] = parsed.dt.normalize()
+                df_valid = df_valid.dropna(subset=["ParsedDate"])
 
-            tgl_awal = pd.Timestamp(tgl_awal).tz_localize(None).normalize()
-            df_filtered = df_valid[(df_valid["ParsedDate"] >= tgl_awal) & (df_valid["ParsedDate"] <= sekarang_ts)]
-        else:
-            df_filtered = pd.DataFrame(columns=[
-                "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
-                "jumlah uang pengeluaran", "Jenis Pemasukan",
-                "jumlah uang pemasukan", "Catatan", "RawDate"
-            ])
-            label_rentang = "-"
+                if periode_aktif == "Harian":
+                    tgl_awal = sekarang_ts
+                    label_rentang = sekarang_ts.strftime("%d %b %Y")
+                elif periode_aktif == "Mingguan":
+                    tgl_awal = sekarang_ts - pd.Timedelta(days=6)
+                    label_rentang = f"{tgl_awal.strftime('%d %b')} - {sekarang_ts.strftime('%d %b %Y')}"
+                elif periode_aktif == "Bulanan":
+                    tgl_awal = sekarang_ts.replace(day=1)
+                    label_rentang = sekarang_ts.strftime("%B %Y")
+                else:  # Kuartal (3 bulan terakhir termasuk bulan ini)
+                    tgl_awal = (sekarang_ts.replace(day=1) - pd.DateOffset(months=2)).tz_localize(None).normalize()
+                    label_rentang = f"{tgl_awal.strftime('%b %Y')} - {sekarang_ts.strftime('%b %Y')}"
 
-        st.caption(f"Periode: **{periode_aktif}** ({label_rentang})")
+                tgl_awal = pd.Timestamp(tgl_awal).tz_localize(None).normalize()
+                df_filtered = df_valid[(df_valid["ParsedDate"] >= tgl_awal) & (df_valid["ParsedDate"] <= sekarang_ts)].copy()
+            else:
+                df_filtered = pd.DataFrame(columns=[
+                    "_rowNumber", "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
+                    "jumlah uang pengeluaran", "Jenis Pemasukan",
+                    "jumlah uang pemasukan", "Catatan", "RawDate", "ParsedDate"
+                ])
+                label_rentang = "-"
 
-        total_pemasukan = float(df_filtered["jumlah uang pemasukan"].sum()) if not df_filtered.empty else 0.0
-        total_pengeluaran = float(df_filtered["jumlah uang pengeluaran"].sum()) if not df_filtered.empty else 0.0
-        selisih_bersih = total_pemasukan - total_pengeluaran
+            st.caption(f"Periode: **{periode_aktif}** ({label_rentang})")
 
-        # Summary Cards
-        c_in, c_out = st.columns(2, gap="small")
-        with c_in:
-            st.markdown(
-                f'<div class="summary-box"><div class="summary-label">↓ Pemasukan</div><div class="summary-val-in">{format_rp(total_pemasukan)}</div></div>',
-                unsafe_allow_html=True
-            )
-        with c_out:
-            st.markdown(
-                f'<div class="summary-box"><div class="summary-label">↑ Pengeluaran</div><div class="summary-val-out">{format_rp(total_pengeluaran)}</div></div>',
-                unsafe_allow_html=True
-            )
+            total_pemasukan = float(df_filtered["jumlah uang pemasukan"].sum()) if not df_filtered.empty else 0.0
+            total_pengeluaran = float(df_filtered["jumlah uang pengeluaran"].sum()) if not df_filtered.empty else 0.0
+            selisih_bersih = total_pemasukan - total_pengeluaran
 
-        st.markdown(
-            f'<div class="summary-box"><div class="summary-label">Saldo Bersih (Pemasukan - Pengeluaran)</div><div class="summary-val-net">{format_rp(selisih_bersih)}</div></div>',
-            unsafe_allow_html=True
-        )
-
-        # 1. Diagram Pengeluaran vs Pemasukan
-        st.markdown('<div class="sub-title">1. Pengeluaran vs Pemasukan</div>', unsafe_allow_html=True)
-        df_vs = pd.DataFrame({
-            "Jenis": ["Pemasukan", "Pengeluaran"],
-            "Nominal (Rp)": [total_pemasukan, total_pengeluaran]
-        }).set_index("Jenis")
-        st.bar_chart(df_vs, height=210, use_container_width=True)
-
-        # 2. Pengeluaran Paling Banyak (Angka + Persentase + Diagram)
-        st.markdown('<div class="sub-title">2. Pengeluaran Paling Banyak</div>', unsafe_allow_html=True)
-
-        df_exp = df_filtered[df_filtered["jumlah uang pengeluaran"] > 0].copy() if not df_filtered.empty else pd.DataFrame()
-        if not df_exp.empty and total_pengeluaran > 0:
-            df_exp["Kategori"] = df_exp["Jenis Pengeluaran"].replace("", "Lainnya").fillna("Lainnya")
-            rekap_kat = (
-                df_exp.groupby("Kategori", as_index=False)["jumlah uang pengeluaran"]
-                .sum()
-                .sort_values("jumlah uang pengeluaran", ascending=False)
-            )
-            rekap_kat["Persentase (%)"] = (rekap_kat["jumlah uang pengeluaran"] / total_pengeluaran) * 100
-
-            st.bar_chart(
-                rekap_kat.set_index("Kategori")[["jumlah uang pengeluaran"]],
-                height=210,
-                use_container_width=True
-            )
-
-            for _, row in rekap_kat.iterrows():
-                kat_nama = row["Kategori"]
-                kat_nominal = row["jumlah uang pengeluaran"]
-                kat_pct = row["Persentase (%)"]
-                lebar_bar = min(max(kat_pct, 2.0), 100.0)
-                st.markdown(
-                    f"""
-                    <div class="cat-row">
-                        <div class="cat-header">
-                            <span>{kat_nama}</span>
-                            <span>{format_rp(kat_nominal)} ({kat_pct:.1f}%)</span>
-                        </div>
-                        <div class="bar-bg">
-                            <div class="bar-fill-out" style="width: {lebar_bar:.1f}%;"></div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-        else:
-            st.info(f"Belum ada data pengeluaran pada periode **{periode_aktif}**.")
+            # Summary Cards
+            c_in, c_out = st.columns(2, gap="small")
+            with
