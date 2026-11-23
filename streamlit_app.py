@@ -38,7 +38,7 @@ OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
-    st.session_state.halaman = "Home"  # "Home", "Catatan", "Entry", "Dashboard"
+    st.session_state.halaman = "Home"  # "Home", "Catatan", "Dashboard"
 if "buka_menu_opsi" not in st.session_state:
     st.session_state.buka_menu_opsi = False
 if "dashboard_unlocked" not in st.session_state:
@@ -55,8 +55,6 @@ if "dibayar_oleh" not in st.session_state:
     st.session_state.dibayar_oleh = "Bersama"
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
-if "entry_key" not in st.session_state:
-    st.session_state.entry_key = 0
 if "periode_dash" not in st.session_state:
     st.session_state.periode_dash = "Bulanan"
 if "edit_counter" not in st.session_state:
@@ -392,50 +390,19 @@ components.html("""
 with st.container(border=True):
     st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
 
-    # Bar Navigasi Utama (Home / Dashboard) — Catatan & Entry tersembunyi di menu Opsi pada Home
-    nav1, nav2 = st.columns(2, gap="small")
-    with nav1:
-        if st.button(
-            "🏠 Home",
-            key="nav_home",
-            use_container_width=True,
-            type="primary" if st.session_state.halaman == "Home" else "secondary"
-        ):
+    # Bar Navigasi Utama (Home saja di awal, Catatan & Dashboard berada di dalam Opsi pada Home)
+    if st.session_state.halaman != "Home":
+        if st.button("🏠 Kembali ke Home", key="nav_back_home", use_container_width=True, type="secondary"):
             st.session_state.halaman = "Home"
             st.rerun()
-    with nav2:
-        if st.button(
-            "📊 Dashboard",
-            key="nav_dash",
-            use_container_width=True,
-            type="primary" if st.session_state.halaman == "Dashboard" else "secondary"
-        ):
-            st.session_state.halaman = "Dashboard"
-            st.session_state.buka_menu_opsi = False
-            st.rerun()
-
-    st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
+        st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
 
     # =========================================================
-    # HALAMAN 1: HOME (MENU CATATAN & ENTRY TERSEMBUNYI DI OPSI)
+    # HALAMAN 1: HOME
     # =========================================================
     if st.session_state.halaman == "Home":
         st.markdown('<div class="card-title">Home</div>', unsafe_allow_html=True)
-        st.caption("Selamat datang di catatan keuangan keluarga Panji & Febby.")
 
-        st.markdown(
-            '<div class="summary-box"><b>📊 Dashboard Keuangan</b><br>'
-            '<span class="summary-label">Pantau ringkasan pemasukan, pengeluaran, grafik, dan kelola data.</span></div>',
-            unsafe_allow_html=True
-        )
-        if st.button("Buka Dashboard", key="home_go_dash", type="primary", use_container_width=True):
-            st.session_state.halaman = "Dashboard"
-            st.session_state.buka_menu_opsi = False
-            st.rerun()
-
-        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-
-        # Tombol Opsi: menyembunyikan menu Catatan dan Entry sampai diklik
         label_opsi = "✖️ Tutup Opsi" if st.session_state.buka_menu_opsi else "⚙️ Opsi"
         if st.button(
             label_opsi,
@@ -448,18 +415,15 @@ with st.container(border=True):
 
         if st.session_state.buka_menu_opsi:
             st.markdown('<div class="opsi-panel">', unsafe_allow_html=True)
-            st.markdown("**Menu Tambahan**")
-            st.caption("Pilih menu input data di bawah ini:")
-
-            if st.button("✍️ Menu Catatan", key="opsi_go_catatan", type="secondary", use_container_width=True):
+            if st.button("✍️ Catatan", key="opsi_go_catatan", type="secondary", use_container_width=True):
                 st.session_state.halaman = "Catatan"
                 st.session_state.buka_menu_opsi = False
                 st.rerun()
 
             st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-            if st.button("📝 Menu Entry", key="opsi_go_entry", type="secondary", use_container_width=True):
-                st.session_state.halaman = "Entry"
+            if st.button("📊 Dashboard", key="opsi_go_dash", type="secondary", use_container_width=True):
+                st.session_state.halaman = "Dashboard"
                 st.session_state.buka_menu_opsi = False
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -619,83 +583,6 @@ with st.container(border=True):
                     st.error(f"Terjadi kesalahan koneksi: {e}")
             else:
                 st.warning("Pastikan nominal sudah diisi dan kategori sudah dipilih.")
-
-    # =========================================================
-    # HALAMAN ENTRY (INPUT CEPAT KE GOOGLE SHEETS)
-    # =========================================================
-    elif st.session_state.halaman == "Entry":
-        st.markdown('<div class="card-title">Menu Entry</div>', unsafe_allow_html=True)
-        st.caption("Input transaksi cepat langsung ke Google Sheets.")
-
-        hari_ini_wib = datetime.now(ZoneInfo("Asia/Jakarta")).date()
-        e_tipe = st.selectbox(
-            "Jenis Transaksi",
-            options=["Pengeluaran", "Pemasukan"],
-            key=f"entry_tipe_{st.session_state.entry_key}"
-        )
-        daftar_kat_e = KATEGORI_PENGELUARAN if e_tipe == "Pengeluaran" else KATEGORI_PEMASUKAN
-        e_kat = st.selectbox(
-            "Kategori",
-            options=daftar_kat_e,
-            key=f"entry_kat_{st.session_state.entry_key}"
-        )
-        e_nom = st.number_input(
-            "Nominal (Rp)",
-            min_value=0,
-            value=None,
-            step=1000,
-            placeholder="0",
-            key=f"entry_nom_{st.session_state.entry_key}"
-        )
-        e_nama = st.selectbox(
-            "Nama",
-            options=OPSI_NAMA,
-            index=2,
-            key=f"entry_nama_{st.session_state.entry_key}"
-        )
-        c_et, c_ec = st.columns(2, gap="small")
-        with c_et:
-            e_tgl = st.date_input(
-                "Tanggal",
-                value=hari_ini_wib,
-                format="DD/MM/YYYY",
-                key=f"entry_tgl_{st.session_state.entry_key}"
-            )
-        with c_ec:
-            e_cat = st.text_input(
-                "Catatan",
-                placeholder="mis. galon / bensin",
-                key=f"entry_cat_{st.session_state.entry_key}"
-            )
-
-        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
-        val_e_nom = e_nom if e_nom is not None else 0
-        if st.button("Simpan Entry", type="primary", use_container_width=True, key="btn_simpan_entry"):
-            if val_e_nom > 0:
-                payload_entry = {
-                    "action": "create",
-                    "Nama": e_nama,
-                    "Hari_tanggal_bulan_tahun": format_tgl_indo(e_tgl),
-                    "Jenis_Pengeluaran": e_kat if e_tipe == "Pengeluaran" else "",
-                    "Jumlah_Uang_Pengeluaran": val_e_nom if e_tipe == "Pengeluaran" else 0,
-                    "Jenis_Pemasukan": e_kat if e_tipe == "Pemasukan" else "",
-                    "Jumlah_Uang_Pemasukan": val_e_nom if e_tipe == "Pemasukan" else 0,
-                    "Catatan": e_cat,
-                    "RawDate": e_tgl.strftime("%Y-%m-%d")
-                }
-                try:
-                    resp = requests.post(WEB_APP_URL, json=payload_entry, timeout=15)
-                    if resp.status_code == 200:
-                        ambil_data_sheets.clear()
-                        st.session_state.entry_key += 1
-                        st.success(f"Entry {e_tipe} {format_rp(val_e_nom)} berhasil disimpan!")
-                        st.rerun()
-                    else:
-                        st.error("Gagal menyimpan entry ke Google Sheets.")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan koneksi: {e}")
-            else:
-                st.warning("Nominal harus lebih dari 0.")
 
     # =========================================================
     # HALAMAN 3: DASHBOARD
