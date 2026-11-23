@@ -264,11 +264,13 @@ st.markdown(f"""
         font-size: 20px !important;
         font-weight: 700 !important;
         color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         padding: 10px 14px !important;
         height: 52px !important;
     }}
     div[data-testid="stNumberInput"] input::placeholder {{
         color: {placeholder_color} !important;
+        -webkit-text-fill-color: {placeholder_color} !important;
         opacity: 1 !important;
     }}
     div[data-testid="stNumberInput"] button {{
@@ -323,16 +325,21 @@ st.markdown(f"""
     }}
 
     div[data-testid="stDateInput"] input,
+    div[data-testid="stDateInput"] span,
+    div[data-testid="stDateInput"] div,
     div[data-testid="stTextInput"] input {{
         color: #000000 !important;
         -webkit-text-fill-color: #000000 !important;
         font-weight: 600 !important;
         font-size: 14px !important;
+    }}
+
+    div[data-testid="stDateInput"] input,
+    div[data-testid="stTextInput"] input {{
         background-color: transparent !important;
     }}
 
-    div[data-testid="stTextInput"] input::placeholder,
-    div[data-testid="stDateInput"] input::placeholder {{
+    div[data-testid="stTextInput"] input::placeholder {{
         color: {placeholder_color} !important;
         -webkit-text-fill-color: {placeholder_color} !important;
         font-weight: 500 !important;
