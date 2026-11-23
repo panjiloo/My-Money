@@ -38,7 +38,7 @@ OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
-    st.session_state.halaman = "Home"  # "Home", "Catatan", "Dashboard"
+    st.session_state.halaman = "Home"
 if "dashboard_unlocked" not in st.session_state:
     st.session_state.dashboard_unlocked = False
 if "tipe" not in st.session_state:
@@ -111,7 +111,7 @@ st.markdown("""
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif !important;
     }
-    
+
     .stApp {
         background-color: #F4F2EA !important;
     }
@@ -356,7 +356,6 @@ components.html("""
 with st.container(border=True):
     st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
 
-    # Bar Navigasi Utama (Home / Catatan / Dashboard)
     nav1, nav2, nav3 = st.columns(3, gap="small")
     with nav1:
         if st.button("🏠 Home", key="nav_home", use_container_width=True,
@@ -396,7 +395,7 @@ with st.container(border=True):
             st.rerun()
 
     # =========================================================
-    # HALAMAN 2: CATATAN (INPUT PENGELUARAN & PEMASUKAN)
+    # HALAMAN 2: CATATAN
     # =========================================================
     elif st.session_state.halaman == "Catatan":
         warna_tab_aktif = "#C8432B" if st.session_state.tipe == "Pengeluaran" else "#1B4332"
@@ -563,7 +562,7 @@ with st.container(border=True):
                 st.warning("Pastikan nominal sudah diisi dan kategori sudah dipilih.")
 
     # =========================================================
-    # HALAMAN 3: DASHBOARD (+ KATA SANDI & MENU EDIT DATA)
+    # HALAMAN 3: DASHBOARD
     # =========================================================
     elif st.session_state.halaman == "Dashboard":
         if not st.session_state.dashboard_unlocked:
@@ -586,69 +585,3 @@ with st.container(border=True):
                 st.markdown('<div class="card-title" style="margin-bottom:4px;">Dashboard</div>', unsafe_allow_html=True)
             with col_rf:
                 if st.button("🔄", key="refresh_dash", use_container_width=True):
-                    ambil_data_sheets.clear()
-                    st.rerun()
-            with col_lk:
-                if st.button("🔒", key="lock_dash", use_container_width=True):
-                    st.session_state.dashboard_unlocked = False
-                    st.rerun()
-
-            # Filter Periode: Harian, Mingguan, Bulanan, Kuartal
-            opsi_periode = ["Harian", "Mingguan", "Bulanan", "Kuartal"]
-            cols_p = st.columns(4, gap="small")
-            for idx, p in enumerate(opsi_periode):
-                with cols_p[idx]:
-                    if st.button(
-                        p,
-                        key=f"periode_{p}",
-                        use_container_width=True,
-                        type="primary" if st.session_state.periode_dash == p else "secondary"
-                    ):
-                        st.session_state.periode_dash = p
-                        st.rerun()
-
-            df_raw = ambil_data_sheets(WEB_APP_URL)
-
-            sekarang_ts = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).tz_localize(None).normalize()
-            periode_aktif = st.session_state.periode_dash
-
-            if not df_raw.empty and "ParsedDate" in df_raw.columns:
-                df_valid = df_raw.copy()
-                parsed = pd.to_datetime(df_valid["ParsedDate"], errors="coerce")
-                if getattr(parsed.dt, "tz", None) is not None:
-                    parsed = parsed.dt.tz_localize(None)
-                df_valid["ParsedDate"] = parsed.dt.normalize()
-                df_valid = df_valid.dropna(subset=["ParsedDate"])
-
-                if periode_aktif == "Harian":
-                    tgl_awal = sekarang_ts
-                    label_rentang = sekarang_ts.strftime("%d %b %Y")
-                elif periode_aktif == "Mingguan":
-                    tgl_awal = sekarang_ts - pd.Timedelta(days=6)
-                    label_rentang = f"{tgl_awal.strftime('%d %b')} - {sekarang_ts.strftime('%d %b %Y')}"
-                elif periode_aktif == "Bulanan":
-                    tgl_awal = sekarang_ts.replace(day=1)
-                    label_rentang = sekarang_ts.strftime("%B %Y")
-                else:  # Kuartal (3 bulan terakhir termasuk bulan ini)
-                    tgl_awal = (sekarang_ts.replace(day=1) - pd.DateOffset(months=2)).tz_localize(None).normalize()
-                    label_rentang = f"{tgl_awal.strftime('%b %Y')} - {sekarang_ts.strftime('%b %Y')}"
-
-                tgl_awal = pd.Timestamp(tgl_awal).tz_localize(None).normalize()
-                df_filtered = df_valid[(df_valid["ParsedDate"] >= tgl_awal) & (df_valid["ParsedDate"] <= sekarang_ts)].copy()
-            else:
-                df_filtered = pd.DataFrame(columns=[
-                    "_rowNumber", "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
-                    "jumlah uang pengeluaran", "Jenis Pemasukan",
-                    "jumlah uang pemasukan", "Catatan", "RawDate", "ParsedDate"
-                ])
-                label_rentang = "-"
-
-            st.caption(f"Periode: **{periode_aktif}** ({label_rentang})")
-
-            total_pemasukan = float(df_filtered["jumlah uang pemasukan"].sum()) if not df_filtered.empty else 0.0
-            total_pengeluaran = float(df_filtered["jumlah uang pengeluaran"].sum()) if not df_filtered.empty else 0.0
-            selisih_bersih = total_pemasukan - total_pengeluaran
-
-            # Summary Cards
-            c_in, c_out = st.columns(2, gap="small")
-            with
