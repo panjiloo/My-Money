@@ -1655,3 +1655,4 @@ with st.container(border=True):
                             st.error(f"Terjadi kesalahan koneksi saat update: {e}")
                 else:
                     st.info(f"Tidak ada transaksi pada periode **{periode_aktif}** ({nama_aktif}) untuk diedit.")
+
