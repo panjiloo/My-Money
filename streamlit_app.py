@@ -37,6 +37,7 @@ KATEGORI_PENGELUARAN = [
     "Lainnya"
 ]
 OPSI_NAMA = ["Panji", "Febby", "Bersama"]
+OPSI_FILTER_NAMA = ["Semua", "Panji", "Febby", "Bersama"]
 
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
@@ -59,6 +60,8 @@ if "form_key" not in st.session_state:
     st.session_state.form_key = 0
 if "periode_dash" not in st.session_state:
     st.session_state.periode_dash = "Bulanan"
+if "filter_nama_dash" not in st.session_state:
+    st.session_state.filter_nama_dash = "Semua"
 if "edit_counter" not in st.session_state:
     st.session_state.edit_counter = 0
 
@@ -220,14 +223,14 @@ def generate_excel_bytes(df_export):
         csv_fallback = df_export.to_csv(index=False).encode("utf-8-sig")
         return csv_fallback, "text/csv", "csv"
 
-def generate_pdf_bytes(periode_aktif, label_rentang, total_pemasukan, total_pengeluaran, selisih_bersih, df_export):
+def generate_pdf_bytes(periode_aktif, label_rentang, nama_filter, total_pemasukan, total_pengeluaran, selisih_bersih, df_export):
     def escape_pdf_text(text):
         clean = str(text).encode("latin-1", "replace").decode("latin-1")
         return clean.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
     lines = [
         "LAPORAN KEUANGAN - PANJI & FEBBY",
-        f"Periode: {periode_aktif} ({label_rentang})",
+        f"Periode: {periode_aktif} ({label_rentang}) | Nama: {nama_filter}",
         f"Total Pemasukan : {format_rp(total_pemasukan)}",
         f"Total Pengeluaran: {format_rp(total_pengeluaran)}",
         f"Saldo Bersih     : {format_rp(selisih_bersih)}",
@@ -235,7 +238,7 @@ def generate_pdf_bytes(periode_aktif, label_rentang, total_pemasukan, total_peng
         "Daftar Transaksi:"
     ]
     if df_export.empty:
-        lines.append("Tidak ada transaksi pada periode ini.")
+        lines.append("Tidak ada transaksi pada periode/filter ini.")
     else:
         for _, r in df_export.head(35).iterrows():
             nominal_rp = format_rp(r["Pemasukan (Rp)"] if r["Jenis"] == "Pemasukan" else r["Pengeluaran (Rp)"])
@@ -828,10 +831,24 @@ with st.container(border=True):
                         st.session_state.periode_dash = p
                         st.rerun()
 
+            st.markdown('<div class="field-label" style="margin-top: 10px;">Filter Nama</div>', unsafe_allow_html=True)
+            cols_n = st.columns(4, gap="small")
+            for idx_n, nm in enumerate(OPSI_FILTER_NAMA):
+                with cols_n[idx_n]:
+                    if st.button(
+                        nm,
+                        key=f"filter_nama_{nm}",
+                        use_container_width=True,
+                        type="primary" if st.session_state.filter_nama_dash == nm else "secondary"
+                    ):
+                        st.session_state.filter_nama_dash = nm
+                        st.rerun()
+
             df_raw = ambil_data_sheets(WEB_APP_URL)
 
             sekarang_ts = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).tz_localize(None).normalize()
             periode_aktif = st.session_state.periode_dash
+            nama_aktif = st.session_state.filter_nama_dash
 
             if not df_raw.empty and "ParsedDate" in df_raw.columns:
                 df_valid = df_raw.copy()
@@ -856,6 +873,9 @@ with st.container(border=True):
 
                 tgl_awal = pd.Timestamp(tgl_awal).tz_localize(None).normalize()
                 df_filtered = df_valid[(df_valid["ParsedDate"] >= tgl_awal) & (df_valid["ParsedDate"] <= sekarang_ts)].copy()
+
+                if nama_aktif != "Semua":
+                    df_filtered = df_filtered[df_filtered["Nama"].str.strip().str.lower() == nama_aktif.lower()].copy()
             else:
                 df_filtered = pd.DataFrame(columns=[
                     "_rowNumber", "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
@@ -864,7 +884,7 @@ with st.container(border=True):
                 ])
                 label_rentang = "-"
 
-            st.caption(f"Periode: **{periode_aktif}** ({label_rentang})")
+            st.caption(f"Periode: **{periode_aktif}** ({label_rentang}) • Nama: **{nama_aktif}**")
 
             total_pemasukan = float(df_filtered["jumlah uang pemasukan"].sum()) if not df_filtered.empty else 0.0
             total_pengeluaran = float(df_filtered["jumlah uang pengeluaran"].sum()) if not df_filtered.empty else 0.0
@@ -942,7 +962,7 @@ with st.container(border=True):
                         unsafe_allow_html=True
                     )
             else:
-                st.info(f"Belum ada data pengeluaran pada periode **{periode_aktif}**.")
+                st.info(f"Belum ada data pengeluaran pada periode **{periode_aktif}** ({nama_aktif}).")
 
             # Menu Download
             st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
@@ -959,18 +979,18 @@ with st.container(border=True):
             if st.session_state.buka_menu_download:
                 df_exp_file = build_export_dataframe(df_filtered)
                 stamp_tgl = sekarang_ts.strftime("%Y%m%d")
-                base_nama = f"keuangan_panji_febby_{periode_aktif.lower()}_{stamp_tgl}"
+                base_nama = f"keuangan_panji_febby_{nama_aktif.lower()}_{periode_aktif.lower()}_{stamp_tgl}"
 
                 excel_bytes, excel_mime, excel_ext = generate_excel_bytes(df_exp_file)
                 csv_bytes = df_exp_file.to_csv(index=False).encode("utf-8-sig")
                 pdf_bytes = generate_pdf_bytes(
-                    periode_aktif, label_rentang,
+                    periode_aktif, label_rentang, nama_aktif,
                     total_pemasukan, total_pengeluaran, selisih_bersih,
                     df_exp_file
                 )
 
                 st.markdown('<div class="download-panel">', unsafe_allow_html=True)
-                st.caption(f"Pilih format file untuk periode **{periode_aktif}**:")
+                st.caption(f"Pilih format file untuk **{nama_aktif}** • **{periode_aktif}**:")
 
                 st.download_button(
                     label=f"📗 Download Excel (.{excel_ext.upper()})",
@@ -1132,4 +1152,4 @@ with st.container(border=True):
                         except Exception as e:
                             st.error(f"Terjadi kesalahan koneksi saat update: {e}")
                 else:
-                    st.info(f"Tidak ada transaksi pada periode **{periode_aktif}** untuk diedit.")
+                    st.info(f"Tidak ada transaksi pada periode **{periode_aktif}** ({nama_aktif}) untuk diedit.")
