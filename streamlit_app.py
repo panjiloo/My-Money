@@ -3,7 +3,6 @@ import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import io
 import requests
 
 # 1. Konfigurasi Halaman
@@ -560,25 +559,34 @@ with st.container(border=True):
                     st.rerun()
 
         df_raw = ambil_data_sheets(WEB_APP_URL)
-        sekarang = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).normalize().tz_localize(None)
+
+        # Samakan semua tanggal menjadi tz-naive (tanpa timezone) & dinormalisasi ke awal hari
+        sekarang_ts = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).tz_localize(None).normalize()
         periode_aktif = st.session_state.periode_dash
 
         if not df_raw.empty and "ParsedDate" in df_raw.columns:
-            df_valid = df_raw.dropna(subset=["ParsedDate"]).copy()
-            if periode_aktif == "Harian":
-                tgl_awal = sekarang
-                label_rentang = sekarang.strftime("%d %b %Y")
-            elif periode_aktif == "Mingguan":
-                tgl_awal = sekarang - pd.Timedelta(days=6)
-                label_rentang = f"{tgl_awal.strftime('%d %b')} - {sekarang.strftime('%d %b %Y')}"
-            elif periode_aktif == "Bulanan":
-                tgl_awal = sekarang.replace(day=1)
-                label_rentang = sekarang.strftime("%B %Y")
-            else:  # Kuartal (3 bulan terakhir termasuk bulan ini)
-                tgl_awal = (sekarang.replace(day=1) - pd.DateOffset(months=2))
-                label_rentang = f"{tgl_awal.strftime('%b %Y')} - {sekarang.strftime('%b %Y')}"
+            df_valid = df_raw.copy()
+            parsed = pd.to_datetime(df_valid["ParsedDate"], errors="coerce")
+            if getattr(parsed.dt, "tz", None) is not None:
+                parsed = parsed.dt.tz_localize(None)
+            df_valid["ParsedDate"] = parsed.dt.normalize()
+            df_valid = df_valid.dropna(subset=["ParsedDate"])
 
-            df_filtered = df_valid[(df_valid["ParsedDate"] >= tgl_awal) & (df_valid["ParsedDate"] <= sekarang)]
+            if periode_aktif == "Harian":
+                tgl_awal = sekarang_ts
+                label_rentang = sekarang_ts.strftime("%d %b %Y")
+            elif periode_aktif == "Mingguan":
+                tgl_awal = sekarang_ts - pd.Timedelta(days=6)
+                label_rentang = f"{tgl_awal.strftime('%d %b')} - {sekarang_ts.strftime('%d %b %Y')}"
+            elif periode_aktif == "Bulanan":
+                tgl_awal = sekarang_ts.replace(day=1)
+                label_rentang = sekarang_ts.strftime("%B %Y")
+            else:  # Kuartal (3 bulan terakhir termasuk bulan ini)
+                tgl_awal = (sekarang_ts.replace(day=1) - pd.DateOffset(months=2)).tz_localize(None).normalize()
+                label_rentang = f"{tgl_awal.strftime('%b %Y')} - {sekarang_ts.strftime('%b %Y')}"
+
+            tgl_awal = pd.Timestamp(tgl_awal).tz_localize(None).normalize()
+            df_filtered = df_valid[(df_valid["ParsedDate"] >= tgl_awal) & (df_valid["ParsedDate"] <= sekarang_ts)]
         else:
             df_filtered = pd.DataFrame(columns=[
                 "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
@@ -632,14 +640,12 @@ with st.container(border=True):
             )
             rekap_kat["Persentase (%)"] = (rekap_kat["jumlah uang pengeluaran"] / total_pengeluaran) * 100
 
-            # Diagram batang per kategori pengeluaran
             st.bar_chart(
                 rekap_kat.set_index("Kategori")[["jumlah uang pengeluaran"]],
                 height=210,
                 use_container_width=True
             )
 
-            # Rincian angka & persentase tiap kategori
             for _, row in rekap_kat.iterrows():
                 kat_nama = row["Kategori"]
                 kat_nominal = row["jumlah uang pengeluaran"]
