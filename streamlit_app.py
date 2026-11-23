@@ -41,6 +41,8 @@ if "halaman" not in st.session_state:
     st.session_state.halaman = "Home"
 if "dashboard_unlocked" not in st.session_state:
     st.session_state.dashboard_unlocked = False
+if "buka_menu_edit" not in st.session_state:
+    st.session_state.buka_menu_edit = False
 if "tipe" not in st.session_state:
     st.session_state.tipe = "Pengeluaran"
 if "kategori" not in st.session_state:
@@ -610,6 +612,7 @@ with st.container(border=True):
             with col_lk:
                 if st.button("🔒", key="lock_dash", use_container_width=True):
                     st.session_state.dashboard_unlocked = False
+                    st.session_state.buka_menu_edit = False
                     st.rerun()
 
             opsi_periode = ["Harian", "Mingguan", "Bulanan", "Kuartal"]
@@ -731,119 +734,132 @@ with st.container(border=True):
             else:
                 st.info(f"Belum ada data pengeluaran pada periode **{periode_aktif}**.")
 
-            st.markdown('<div class="sub-title">3. Edit Data Transaksi</div>', unsafe_allow_html=True)
+            # 3. Tombol Pemicu Menu Edit Data (Hanya muncul isinya jika diklik)
+            st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+            label_btn_edit = "✖️ Tutup Menu Edit" if st.session_state.buka_menu_edit else "✏️ Edit Data Transaksi"
+            if st.button(
+                label_btn_edit,
+                key="toggle_menu_edit",
+                type="primary" if st.session_state.buka_menu_edit else "secondary",
+                use_container_width=True
+            ):
+                st.session_state.buka_menu_edit = not st.session_state.buka_menu_edit
+                st.rerun()
 
-            if not df_filtered.empty:
-                df_urut = df_filtered.sort_values(by=["ParsedDate", "_rowNumber"], ascending=[False, False]).reset_index(drop=True)
+            if st.session_state.buka_menu_edit:
+                st.markdown('<div class="sub-title">Form Edit Data Transaksi</div>', unsafe_allow_html=True)
 
-                pilihan_label = []
-                label_to_row = {}
-                for _, r in df_urut.iterrows():
-                    is_in = float(r["jumlah uang pemasukan"]) > 0
-                    jenis_str = "Pemasukan" if is_in else "Pengeluaran"
-                    kat_str = r["Jenis Pemasukan"] if is_in else r["Jenis Pengeluaran"]
-                    nom_val = float(r["jumlah uang pemasukan"]) if is_in else float(r["jumlah uang pengeluaran"])
-                    tgl_str = r["ParsedDate"].strftime("%d/%m/%Y") if pd.notna(r["ParsedDate"]) else r["RawDate"]
-                    cat_str = f" - {r['Catatan']}" if r["Catatan"].strip() else ""
-                    lbl = f"Baris {int(r['_rowNumber'])} | {tgl_str} | {r['Nama']} | {kat_str} ({jenis_str}) {format_rp(nom_val)}{cat_str}"
-                    pilihan_label.append(lbl)
-                    label_to_row[lbl] = r
+                if not df_filtered.empty:
+                    df_urut = df_filtered.sort_values(by=["ParsedDate", "_rowNumber"], ascending=[False, False]).reset_index(drop=True)
 
-                selected_lbl = st.selectbox(
-                    "Pilih transaksi yang ingin diperbaiki",
-                    options=pilihan_label,
-                    key=f"select_edit_trx_{st.session_state.edit_counter}"
-                )
+                    pilihan_label = []
+                    label_to_row = {}
+                    for _, r in df_urut.iterrows():
+                        is_in = float(r["jumlah uang pemasukan"]) > 0
+                        jenis_str = "Pemasukan" if is_in else "Pengeluaran"
+                        kat_str = r["Jenis Pemasukan"] if is_in else r["Jenis Pengeluaran"]
+                        nom_val = float(r["jumlah uang pemasukan"]) if is_in else float(r["jumlah uang pengeluaran"])
+                        tgl_str = r["ParsedDate"].strftime("%d/%m/%Y") if pd.notna(r["ParsedDate"]) else r["RawDate"]
+                        cat_str = f" - {r['Catatan']}" if r["Catatan"].strip() else ""
+                        lbl = f"Baris {int(r['_rowNumber'])} | {tgl_str} | {r['Nama']} | {kat_str} ({jenis_str}) {format_rp(nom_val)}{cat_str}"
+                        pilihan_label.append(lbl)
+                        label_to_row[lbl] = r
 
-                trx = label_to_row[selected_lbl]
-                row_number_asli = int(trx["_rowNumber"])
-
-                awal_is_in = float(trx["jumlah uang pemasukan"]) > 0
-                awal_tipe = "Pemasukan" if awal_is_in else "Pengeluaran"
-                awal_nom = int(round(float(trx["jumlah uang pemasukan"]) if awal_is_in else float(trx["jumlah uang pengeluaran"])))
-                awal_kat = trx["Jenis Pemasukan"].strip() if awal_is_in else trx["Jenis Pengeluaran"].strip()
-                awal_nama = trx["Nama"].strip() if trx["Nama"].strip() in OPSI_NAMA else "Bersama"
-                awal_tgl = trx["ParsedDate"].date() if pd.notna(trx["ParsedDate"]) else datetime.now(ZoneInfo("Asia/Jakarta")).date()
-                awal_cat = trx["Catatan"]
-
-                edit_tipe = st.selectbox(
-                    "Jenis Transaksi",
-                    options=["Pengeluaran", "Pemasukan"],
-                    index=0 if awal_tipe == "Pengeluaran" else 1,
-                    key=f"edit_tipe_{row_number_asli}_{st.session_state.edit_counter}"
-                )
-
-                daftar_kat_edit = KATEGORI_PEMASUKAN if edit_tipe == "Pemasukan" else KATEGORI_PENGELUARAN
-                if awal_kat not in daftar_kat_edit:
-                    daftar_kat_edit = [awal_kat] + daftar_kat_edit if awal_kat else daftar_kat_edit
-                kat_idx = daftar_kat_edit.index(awal_kat) if awal_kat in daftar_kat_edit else 0
-
-                edit_kat = st.selectbox(
-                    "Kategori",
-                    options=daftar_kat_edit,
-                    index=kat_idx,
-                    key=f"edit_kat_{row_number_asli}_{edit_tipe}_{st.session_state.edit_counter}"
-                )
-
-                edit_nom = st.number_input(
-                    "Nominal Baru (Rp)",
-                    min_value=1,
-                    value=max(awal_nom, 1),
-                    step=1000,
-                    key=f"edit_nom_{row_number_asli}_{st.session_state.edit_counter}"
-                )
-
-                edit_nama = st.selectbox(
-                    "Nama",
-                    options=OPSI_NAMA,
-                    index=OPSI_NAMA.index(awal_nama),
-                    key=f"edit_nama_{row_number_asli}_{st.session_state.edit_counter}"
-                )
-
-                c_etgl, c_ecat = st.columns(2, gap="small")
-                with c_etgl:
-                    edit_tgl = st.date_input(
-                        "Tanggal Baru",
-                        value=awal_tgl,
-                        format="DD/MM/YYYY",
-                        key=f"edit_tgl_{row_number_asli}_{st.session_state.edit_counter}"
-                    )
-                with c_ecat:
-                    edit_cat = st.text_input(
-                        "Catatan Baru",
-                        value=awal_cat,
-                        key=f"edit_cat_{row_number_asli}_{st.session_state.edit_counter}"
+                    selected_lbl = st.selectbox(
+                        "Pilih transaksi yang ingin diperbaiki",
+                        options=pilihan_label,
+                        key=f"select_edit_trx_{st.session_state.edit_counter}"
                     )
 
-                if st.button("💾 Update ke Google Sheets", type="primary", use_container_width=True, key=f"btn_update_{row_number_asli}"):
-                    jns_peng = edit_kat if edit_tipe == "Pengeluaran" else ""
-                    jml_peng = int(edit_nom) if edit_tipe == "Pengeluaran" else 0
-                    jns_pem = edit_kat if edit_tipe == "Pemasukan" else ""
-                    jml_pem = int(edit_nom) if edit_tipe == "Pemasukan" else 0
+                    trx = label_to_row[selected_lbl]
+                    row_number_asli = int(trx["_rowNumber"])
 
-                    payload_update = {
-                        "action": "update",
-                        "rowNumber": row_number_asli,
-                        "Nama": edit_nama,
-                        "Hari_tanggal_bulan_tahun": format_tgl_indo(edit_tgl),
-                        "Jenis_Pengeluaran": jns_peng,
-                        "Jumlah_Uang_Pengeluaran": jml_peng,
-                        "Jenis_Pemasukan": jns_pem,
-                        "Jumlah_Uang_Pemasukan": jml_pem,
-                        "Catatan": edit_cat,
-                        "RawDate": edit_tgl.strftime("%Y-%m-%d")
-                    }
+                    awal_is_in = float(trx["jumlah uang pemasukan"]) > 0
+                    awal_tipe = "Pemasukan" if awal_is_in else "Pengeluaran"
+                    awal_nom = int(round(float(trx["jumlah uang pemasukan"]) if awal_is_in else float(trx["jumlah uang pengeluaran"])))
+                    awal_kat = trx["Jenis Pemasukan"].strip() if awal_is_in else trx["Jenis Pengeluaran"].strip()
+                    awal_nama = trx["Nama"].strip() if trx["Nama"].strip() in OPSI_NAMA else "Bersama"
+                    awal_tgl = trx["ParsedDate"].date() if pd.notna(trx["ParsedDate"]) else datetime.now(ZoneInfo("Asia/Jakarta")).date()
+                    awal_cat = trx["Catatan"]
 
-                    try:
-                        resp = requests.post(WEB_APP_URL, json=payload_update, timeout=15)
-                        if resp.status_code == 200:
-                            ambil_data_sheets.clear()
-                            st.session_state.edit_counter += 1
-                            st.success(f"Baris {row_number_asli} berhasil diperbarui di Google Sheets!")
-                            st.rerun()
-                        else:
-                            st.error("Gagal mengupdate data ke Google Sheets.")
-                    except Exception as e:
-                        st.error(f"Terjadi kesalahan koneksi saat update: {e}")
-            else:
-                st.info(f"Tidak ada transaksi pada periode **{periode_aktif}** untuk diedit.")
+                    edit_tipe = st.selectbox(
+                        "Jenis Transaksi",
+                        options=["Pengeluaran", "Pemasukan"],
+                        index=0 if awal_tipe == "Pengeluaran" else 1,
+                        key=f"edit_tipe_{row_number_asli}_{st.session_state.edit_counter}"
+                    )
+
+                    daftar_kat_edit = KATEGORI_PEMASUKAN if edit_tipe == "Pemasukan" else KATEGORI_PENGELUARAN
+                    if awal_kat not in daftar_kat_edit:
+                        daftar_kat_edit = [awal_kat] + daftar_kat_edit if awal_kat else daftar_kat_edit
+                    kat_idx = daftar_kat_edit.index(awal_kat) if awal_kat in daftar_kat_edit else 0
+
+                    edit_kat = st.selectbox(
+                        "Kategori",
+                        options=daftar_kat_edit,
+                        index=kat_idx,
+                        key=f"edit_kat_{row_number_asli}_{edit_tipe}_{st.session_state.edit_counter}"
+                    )
+
+                    edit_nom = st.number_input(
+                        "Nominal Baru (Rp)",
+                        min_value=1,
+                        value=max(awal_nom, 1),
+                        step=1000,
+                        key=f"edit_nom_{row_number_asli}_{st.session_state.edit_counter}"
+                    )
+
+                    edit_nama = st.selectbox(
+                        "Nama",
+                        options=OPSI_NAMA,
+                        index=OPSI_NAMA.index(awal_nama),
+                        key=f"edit_nama_{row_number_asli}_{st.session_state.edit_counter}"
+                    )
+
+                    c_etgl, c_ecat = st.columns(2, gap="small")
+                    with c_etgl:
+                        edit_tgl = st.date_input(
+                            "Tanggal Baru",
+                            value=awal_tgl,
+                            format="DD/MM/YYYY",
+                            key=f"edit_tgl_{row_number_asli}_{st.session_state.edit_counter}"
+                        )
+                    with c_ecat:
+                        edit_cat = st.text_input(
+                            "Catatan Baru",
+                            value=awal_cat,
+                            key=f"edit_cat_{row_number_asli}_{st.session_state.edit_counter}"
+                        )
+
+                    if st.button("💾 Update ke Google Sheets", type="primary", use_container_width=True, key=f"btn_update_{row_number_asli}"):
+                        jns_peng = edit_kat if edit_tipe == "Pengeluaran" else ""
+                        jml_peng = int(edit_nom) if edit_tipe == "Pengeluaran" else 0
+                        jns_pem = edit_kat if edit_tipe == "Pemasukan" else ""
+                        jml_pem = int(edit_nom) if edit_tipe == "Pemasukan" else 0
+
+                        payload_update = {
+                            "action": "update",
+                            "rowNumber": row_number_asli,
+                            "Nama": edit_nama,
+                            "Hari_tanggal_bulan_tahun": format_tgl_indo(edit_tgl),
+                            "Jenis_Pengeluaran": jns_peng,
+                            "Jumlah_Uang_Pengeluaran": jml_peng,
+                            "Jenis_Pemasukan": jns_pem,
+                            "Jumlah_Uang_Pemasukan": jml_pem,
+                            "Catatan": edit_cat,
+                            "RawDate": edit_tgl.strftime("%Y-%m-%d")
+                        }
+
+                        try:
+                            resp = requests.post(WEB_APP_URL, json=payload_update, timeout=15)
+                            if resp.status_code == 200:
+                                ambil_data_sheets.clear()
+                                st.session_state.edit_counter += 1
+                                st.success(f"Baris {row_number_asli} berhasil diperbarui di Google Sheets!")
+                                st.rerun()
+                            else:
+                                st.error("Gagal mengupdate data ke Google Sheets.")
+                        except Exception as e:
+                            st.error(f"Terjadi kesalahan koneksi saat update: {e}")
+                else:
+                    st.info(f"Tidak ada transaksi pada periode **{periode_aktif}** untuk diedit.")
