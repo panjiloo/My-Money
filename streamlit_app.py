@@ -38,7 +38,7 @@ OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
-    st.session_state.halaman = "Home"  # "Home", "Catatan", "Dashboard"
+    st.session_state.halaman = "Home"  # "Home", "Entry", "Dashboard"
 if "dashboard_unlocked" not in st.session_state:
     st.session_state.dashboard_unlocked = False
 if "buka_menu_edit" not in st.session_state:
@@ -105,8 +105,8 @@ def format_tgl_indo(tgl_date):
     ][tgl_date.month - 1]
     return f"{nama_hari}, {tgl_date.day} {bulan_str} {tgl_date.year}"
 
-# Tema dinamis: merah saat di halaman Catatan dengan tipe Pengeluaran, hijau untuk lainnya
-is_tema_merah = (st.session_state.halaman == "Catatan" and st.session_state.tipe == "Pengeluaran")
+# Tema dinamis: merah saat di halaman Entry dengan tipe Pengeluaran, hijau untuk lainnya
+is_tema_merah = (st.session_state.halaman == "Entry" and st.session_state.tipe == "Pengeluaran")
 
 if is_tema_merah:
     bg_app = "#F9ECE9"
@@ -419,26 +419,26 @@ with st.container(border=True):
     st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
 
     # =========================================================
-    # HALAMAN 1: HOME (LANGSUNG MENU CATATAN & DASHBOARD)
+    # HALAMAN 1: HOME (LANGSUNG MENU ENTRY & DASHBOARD)
     # =========================================================
     if st.session_state.halaman == "Home":
         st.markdown('<div class="card-title">Home</div>', unsafe_allow_html=True)
 
-        if st.button("✍️ Menu Catatan", key="home_go_catatan", type="primary", use_container_width=True):
-            st.session_state.halaman = "Catatan"
+        if st.button("✍️ Entry", key="home_go_entry", type="primary", use_container_width=True):
+            st.session_state.halaman = "Entry"
             st.rerun()
 
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
-        if st.button("📊 Menu Dashboard", key="home_go_dash", type="secondary", use_container_width=True):
+        if st.button("📊 Dashboard", key="home_go_dash", type="secondary", use_container_width=True):
             st.session_state.halaman = "Dashboard"
             st.rerun()
 
     # =========================================================
-    # HALAMAN 2: CATATAN
+    # HALAMAN 2: ENTRY (INPUT PENGELUARAN & PEMASUKAN)
     # =========================================================
-    elif st.session_state.halaman == "Catatan":
-        st.markdown('<div class="card-title">Catat transaksi</div>', unsafe_allow_html=True)
+    elif st.session_state.halaman == "Entry":
+        st.markdown('<div class="card-title">Entry</div>', unsafe_allow_html=True)
 
         col_in, col_out = st.columns(2, gap="small")
         with col_in:
@@ -596,7 +596,7 @@ with st.container(border=True):
     elif st.session_state.halaman == "Dashboard":
         if not st.session_state.dashboard_unlocked:
             st.markdown('<div class="card-title">🔒 Kunci Dashboard</div>', unsafe_allow_html=True)
-            st.caption("Masukkan kata sandi untuk membuka menu Dashboard.")
+            st.caption("Masukkan kata sandi untuk membuka Dashboard.")
 
             with st.form("form_password_dashboard", clear_on_submit=False):
                 input_pw = st.text_input("Kata Sandi", type="password", placeholder="Masukkan kata sandi...")
