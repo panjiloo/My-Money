@@ -105,154 +105,171 @@ def format_tgl_indo(tgl_date):
     ][tgl_date.month - 1]
     return f"{nama_hari}, {tgl_date.day} {bulan_str} {tgl_date.year}"
 
+# Tema dinamis: merah saat di halaman Catatan dengan tipe Pengeluaran, hijau untuk lainnya
+is_tema_merah = (st.session_state.halaman == "Catatan" and st.session_state.tipe == "Pengeluaran")
+
+if is_tema_merah:
+    bg_app = "#F9ECE9"
+    aksen_utama = "#C8432B"
+    aksen_gelap = "#9E2A1C"
+    bg_input_soft = "#FFF7F5"
+    border_soft = "#F2D5CF"
+else:
+    bg_app = "#F4F2EA"
+    aksen_utama = "#1B4332"
+    aksen_gelap = "#133024"
+    bg_input_soft = "#F8F7F4"
+    border_soft = "#EAE7DD"
+
 # 4. Custom CSS
-st.markdown("""
+st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
-    html, body, [class*="css"] {
+    html, body, [class*="css"] {{
         font-family: 'Plus Jakarta Sans', sans-serif !important;
-    }
+    }}
 
-    .stApp {
-        background-color: #F4F2EA !important;
-    }
+    .stApp {{
+        background-color: {bg_app} !important;
+        transition: background-color 0.25s ease !important;
+    }}
 
-    header[data-testid="stHeader"], footer {
+    header[data-testid="stHeader"], footer {{
         display: none !important;
-    }
+    }}
 
-    .block-container {
+    .block-container {{
         max-width: 440px !important;
         padding: 1.2rem 0 0 0 !important;
         margin: 0 auto !important;
-    }
+    }}
 
-    iframe[title="streamlit_components_v1.html_v1"] {
+    iframe[title="streamlit_components_v1.html_v1"] {{
         margin-bottom: -10px !important;
-    }
+    }}
 
-    div[data-testid="stVerticalBlockBorderWrapper"] {
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
         background-color: #FFFFFF !important;
         border-radius: 28px 28px 0 0 !important;
         padding: 14px 20px 36px 20px !important;
-        border: none !important;
+        border: 1px solid {border_soft} !important;
         box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
-    }
+    }}
 
-    .sheet-handle {
+    .sheet-handle {{
         width: 38px;
         height: 4px;
         background-color: #D2CFC4;
         border-radius: 4px;
         margin: 0 auto 16px auto;
-    }
+    }}
 
-    .card-title {
+    .card-title {{
         font-size: 21px;
         font-weight: 700;
-        color: #1F2421;
+        color: {aksen_gelap if is_tema_merah else "#1F2421"};
         margin-bottom: 14px;
         letter-spacing: -0.4px;
-    }
+    }}
 
-    .sub-title {
+    .sub-title {{
         font-size: 15px;
         font-weight: 700;
         color: #1F2421;
         margin-top: 18px;
         margin-bottom: 10px;
-    }
+    }}
 
-    .field-label {
+    .field-label {{
         font-size: 13.5px;
         font-weight: 600;
-        color: #6B6D66;
+        color: {aksen_utama if is_tema_merah else "#6B6D66"};
         margin-top: 14px;
         margin-bottom: 6px;
-    }
+    }}
 
-    .summary-box {
+    .summary-box {{
         background-color: #F8F7F4;
         border: 1px solid #EAE7DD;
         border-radius: 16px;
         padding: 12px 14px;
         margin-bottom: 10px;
-    }
+    }}
 
-    .summary-label {
+    .summary-label {{
         font-size: 12px;
         font-weight: 600;
         color: #6B6D66;
-    }
+    }}
 
-    .summary-val-in {
+    .summary-val-in {{
         font-size: 17px;
         font-weight: 700;
         color: #1B4332;
         margin-top: 2px;
-    }
+    }}
 
-    .summary-val-out {
+    .summary-val-out {{
         font-size: 17px;
         font-weight: 700;
         color: #C8432B;
         margin-top: 2px;
-    }
+    }}
 
-    .summary-val-net {
+    .summary-val-net {{
         font-size: 18px;
         font-weight: 700;
         color: #1F2421;
         margin-top: 2px;
-    }
+    }}
 
-    .cat-row {
+    .cat-row {{
         background-color: #F8F7F4;
         border: 1px solid #EAE7DD;
         border-radius: 12px;
         padding: 10px 12px;
         margin-bottom: 8px;
-    }
+    }}
 
-    .cat-header {
+    .cat-header {{
         display: flex;
         justify-content: space-between;
         font-size: 13px;
         font-weight: 700;
         color: #000000;
         margin-bottom: 6px;
-    }
+    }}
 
-    .bar-bg {
+    .bar-bg {{
         width: 100%;
         height: 8px;
         background-color: #EAE7DD;
         border-radius: 999px;
         overflow: hidden;
-    }
+    }}
 
-    .bar-fill-out {
+    .bar-fill-out {{
         height: 100%;
         background-color: #C8432B;
         border-radius: 999px;
-    }
+    }}
 
-    div[data-testid="stNumberInput"] input {
-        background-color: #F8F7F4 !important;
-        border: 1.8px solid #355E4B !important;
+    div[data-testid="stNumberInput"] input {{
+        background-color: {bg_input_soft} !important;
+        border: 1.8px solid {aksen_utama} !important;
         border-radius: 14px !important;
         font-size: 20px !important;
         font-weight: 700 !important;
         color: #000000 !important;
         padding: 10px 14px !important;
         height: 52px !important;
-    }
-    div[data-testid="stNumberInput"] button {
+    }}
+    div[data-testid="stNumberInput"] button {{
         display: none !important;
-    }
+    }}
 
-    div.stButton > button {
+    div.stButton > button {{
         border-radius: 999px !important;
         font-size: 13px !important;
         font-weight: 600 !important;
@@ -260,43 +277,47 @@ st.markdown("""
         min-height: 38px !important;
         transition: all 0.15s ease !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
-    }
+    }}
 
-    div.stButton > button p {
+    div.stButton > button p {{
         font-weight: inherit !important;
-    }
+    }}
 
-    div.stButton > button[kind="secondary"] {
-        background-color: #F8F7F4 !important;
+    div.stButton > button[kind="secondary"] {{
+        background-color: {bg_input_soft} !important;
         color: #000000 !important;
-        border: 1px solid #EAE7DD !important;
-    }
-    div.stButton > button[kind="secondary"]:hover {
-        border-color: #1B4332 !important;
-        color: #1B4332 !important;
-    }
+        border: 1px solid {border_soft} !important;
+    }}
+    div.stButton > button[kind="secondary"]:hover {{
+        border-color: {aksen_utama} !important;
+        color: {aksen_utama} !important;
+    }}
 
-    div.stButton > button[kind="primary"] {
-        background-color: #1B4332 !important;
+    div.stButton > button[kind="primary"] {{
+        background-color: {aksen_utama} !important;
         color: #FFFFFF !important;
-        border: 1px solid #1B4332 !important;
-    }
+        border: 1px solid {aksen_utama} !important;
+    }}
+    div.stButton > button[kind="primary"]:hover {{
+        background-color: {aksen_gelap} !important;
+        border-color: {aksen_gelap} !important;
+    }}
 
     div[data-testid="stDateInput"] > div > div,
-    div[data-testid="stTextInput"] > div > div {
-        background-color: #F8F7F4 !important;
-        border: 1px solid #EAE7DD !important;
+    div[data-testid="stTextInput"] > div > div {{
+        background-color: {bg_input_soft} !important;
+        border: 1px solid {border_soft} !important;
         border-radius: 12px !important;
         height: 44px !important;
-    }
+    }}
 
     div[data-testid="stDateInput"] input,
-    div[data-testid="stTextInput"] input {
+    div[data-testid="stTextInput"] input {{
         color: #000000 !important;
         font-weight: 600 !important;
         font-size: 14px !important;
         background-color: transparent !important;
-    }
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -387,7 +408,7 @@ with st.container(border=True):
             st.session_state.halaman = "Dashboard"
             st.rerun()
 
-    st.markdown("<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid #EAE7DD;'>", unsafe_allow_html=True)
+    st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
 
     # =========================================================
     # HALAMAN 1: HOME
@@ -420,17 +441,6 @@ with st.container(border=True):
     # HALAMAN 2: CATATAN
     # =========================================================
     elif st.session_state.halaman == "Catatan":
-        warna_tab_aktif = "#C8432B" if st.session_state.tipe == "Pengeluaran" else "#1B4332"
-        st.markdown(f"""
-        <style>
-            div[data-testid="stHorizontalBlock"]:nth-of-type(2) div.stButton > button[kind="primary"] {{
-                background-color: {warna_tab_aktif} !important;
-                border-color: {warna_tab_aktif} !important;
-                border-radius: 11px !important;
-            }}
-        </style>
-        """, unsafe_allow_html=True)
-
         st.markdown('<div class="card-title">Catat transaksi</div>', unsafe_allow_html=True)
 
         col_in, col_out = st.columns(2, gap="small")
@@ -734,7 +744,6 @@ with st.container(border=True):
             else:
                 st.info(f"Belum ada data pengeluaran pada periode **{periode_aktif}**.")
 
-            # 3. Tombol Pemicu Menu Edit Data (Hanya muncul isinya jika diklik)
             st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
             label_btn_edit = "✖️ Tutup Menu Edit" if st.session_state.buka_menu_edit else "✏️ Edit Data Transaksi"
             if st.button(
