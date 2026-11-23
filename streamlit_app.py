@@ -65,41 +65,105 @@ if "filter_nama_dash" not in st.session_state:
 if "edit_counter" not in st.session_state:
     st.session_state.edit_counter = 0
 
+def _bersihkan_angka_rp(val):
+    if val is None or val == "":
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val) if pd.notna(val) else 0.0
+    s = str(val).strip()
+    s = s.replace("Rp", "").replace("rp", "").replace(" ", "")
+    # Tangani format ribuan titik Indonesia (misal 50.000 -> 50000) atau koma desimal
+    if "." in s and "," in s:
+        s = s.replace(".", "").replace(",", ".")
+    elif "." in s:
+        parts = s.split(".")
+        if all(len(p) == 3 for p in parts[1:]):
+            s = "".join(parts)
+    elif "," in s:
+        parts = s.split(",")
+        if all(len(p) == 3 for p in parts[1:]):
+            s = "".join(parts)
+        else:
+            s = s.replace(",", ".")
+    num = pd.to_numeric(s, errors="coerce")
+    return float(num) if pd.notna(num) else 0.0
+
+def _cari_kolom(df, kandidat_nama):
+    norm_map = {str(c).strip().lower().replace("_", " "): c for c in df.columns}
+    for k in kandidat_nama:
+        key_norm = k.strip().lower().replace("_", " ")
+        if key_norm in norm_map:
+            return norm_map[key_norm]
+    return None
+
 # 3. Fungsi Ambil & Bersihkan Data dari Google Sheets
-@st.cache_data(ttl=15)
+@st.cache_data(ttl=5)
 def ambil_data_sheets(url):
-    try:
-        resp = requests.get(url, timeout=15)
-        if resp.status_code == 200:
-            raw_json = resp.json()
-            if not raw_json:
-                return pd.DataFrame(columns=[
-                    "_rowNumber", "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
-                    "jumlah uang pengeluaran", "Jenis Pemasukan",
-                    "jumlah uang pemasukan", "Catatan", "RawDate", "ParsedDate"
-                ])
-            df = pd.DataFrame(raw_json)
-            if "_rowNumber" not in df.columns:
-                df["_rowNumber"] = range(2, len(df) + 2)
-            for col in ["jumlah uang pengeluaran", "jumlah uang pemasukan"]:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-                else:
-                    df[col] = 0.0
-            for col in ["Nama", "Jenis Pengeluaran", "Jenis Pemasukan", "Catatan", "RawDate"]:
-                if col not in df.columns:
-                    df[col] = ""
-                else:
-                    df[col] = df[col].fillna("").astype(str)
-            df["ParsedDate"] = pd.to_datetime(df["RawDate"], errors="coerce")
-            return df
-    except Exception:
-        pass
-    return pd.DataFrame(columns=[
+    kolom_standar = [
         "_rowNumber", "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
         "jumlah uang pengeluaran", "Jenis Pemasukan",
         "jumlah uang pemasukan", "Catatan", "RawDate", "ParsedDate"
-    ])
+    ]
+    try:
+        resp = requests.get(url, timeout=20)
+        if resp.status_code == 200:
+            raw_json = resp.json()
+            if isinstance(raw_json, dict):
+                raw_json = raw_json.get("data", [])
+            if not raw_json:
+                return pd.DataFrame(columns=kolom_standar)
+
+            df = pd.DataFrame(raw_json)
+            if df.empty:
+                return pd.DataFrame(columns=kolom_standar)
+
+            col_row = _cari_kolom(df, ["_rowNumber", "rowNumber", "row"])
+            if col_row:
+                df["_rowNumber"] = pd.to_numeric(df[col_row], errors="coerce").fillna(0).astype(int)
+            else:
+                df["_rowNumber"] = range(2, len(df) + 2)
+
+            col_peng_jml = _cari_kolom(df, [
+                "jumlah uang pengeluaran", "Jumlah_Uang_Pengeluaran", "Jumlah Uang Pengeluaran", "Pengeluaran"
+            ])
+            col_pem_jml = _cari_kolom(df, [
+                "jumlah uang pemasukan", "Jumlah_Uang_Pemasukan", "Jumlah Uang Pemasukan", "Pemasukan"
+            ])
+
+            df["jumlah uang pengeluaran"] = df[col_peng_jml].apply(_bersihkan_angka_rp) if col_peng_jml else 0.0
+            df["jumlah uang pemasukan"] = df[col_pem_jml].apply(_bersihkan_angka_rp) if col_pem_jml else 0.0
+
+            mapping_teks = {
+                "Nama": ["Nama", "Dibayar oleh", "Diterima oleh"],
+                "Hari tanggal bulan tahun": ["Hari tanggal bulan tahun", "Hari_tanggal_bulan_tahun", "Tanggal Indo"],
+                "Jenis Pengeluaran": ["Jenis Pengeluaran", "Jenis_Pengeluaran", "Kategori Pengeluaran"],
+                "Jenis Pemasukan": ["Jenis Pemasukan", "Jenis_Pemasukan", "Kategori Pemasukan"],
+                "Catatan": ["Catatan", "Keterangan", "Notes"],
+                "RawDate": ["RawDate", "Tanggal", "Date"]
+            }
+
+            for target_col, kandidat in mapping_teks.items():
+                ditemukan = _cari_kolom(df, kandidat)
+                if ditemukan:
+                    df[target_col] = df[ditemukan].fillna("").astype(str).str.strip()
+                else:
+                    df[target_col] = ""
+
+            parsed_raw = pd.to_datetime(df["RawDate"], errors="coerce")
+            # Jika RawDate kosong/gagal diparse, coba ambil dari kolom Tanggal atau Hari tanggal bulan tahun
+            if parsed_raw.isna().any():
+                col_tgl_alt = _cari_kolom(df, ["Tanggal", "Hari tanggal bulan tahun", "Hari_tanggal_bulan_tahun"])
+                if col_tgl_alt:
+                    parsed_alt = pd.to_datetime(df[col_tgl_alt], errors="coerce", dayfirst=True)
+                    parsed_raw = parsed_raw.fillna(parsed_alt)
+
+            if getattr(parsed_raw.dt, "tz", None) is not None:
+                parsed_raw = parsed_raw.dt.tz_localize(None)
+            df["ParsedDate"] = parsed_raw.dt.normalize()
+            return df
+    except Exception:
+        pass
+    return pd.DataFrame(columns=kolom_standar)
 
 def format_rp(angka):
     return f"Rp {int(round(angka)):,}".replace(",", ".")
@@ -601,7 +665,6 @@ components.html("""
 with st.container(border=True):
     st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
 
-    # Bar Navigasi Atas: hanya Home (atau Kembali ke Home saat di submenu)
     if st.session_state.halaman == "Home":
         if st.button("🏠 Home", key="nav_home", use_container_width=True, type="primary"):
             st.session_state.halaman = "Home"
@@ -614,7 +677,7 @@ with st.container(border=True):
     st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
 
     # =========================================================
-    # HALAMAN 1: HOME (LANGSUNG MENU ENTRY & DASHBOARD)
+    # HALAMAN 1: HOME
     # =========================================================
     if st.session_state.halaman == "Home":
         st.markdown('<div class="card-title">Home</div>', unsafe_allow_html=True)
@@ -630,7 +693,7 @@ with st.container(border=True):
             st.rerun()
 
     # =========================================================
-    # HALAMAN 2: ENTRY (INPUT PENGELUARAN & PEMASUKAN)
+    # HALAMAN 2: ENTRY
     # =========================================================
     elif st.session_state.halaman == "Entry":
         st.markdown('<div class="card-title">Entry</div>', unsafe_allow_html=True)
@@ -771,7 +834,7 @@ with st.container(border=True):
                 }
 
                 try:
-                    response = requests.post(WEB_APP_URL, json=payload, timeout=15)
+                    response = requests.post(WEB_APP_URL, json=payload, timeout=20)
                     if response.status_code == 200:
                         ambil_data_sheets.clear()
                         st.success(f"Berhasil tersimpan: {st.session_state.tipe} {format_rp(val_nominal)}!")
@@ -818,8 +881,8 @@ with st.container(border=True):
                     st.session_state.buka_menu_download = False
                     st.rerun()
 
-            opsi_periode = ["Harian", "Mingguan", "Bulanan", "Kuartal"]
-            cols_p = st.columns(4, gap="small")
+            opsi_periode = ["Harian", "Mingguan", "Bulanan", "Kuartal", "Semua"]
+            cols_p = st.columns(5, gap="small")
             for idx, p in enumerate(opsi_periode):
                 with cols_p[idx]:
                     if st.button(
@@ -856,23 +919,42 @@ with st.container(border=True):
                 if getattr(parsed.dt, "tz", None) is not None:
                     parsed = parsed.dt.tz_localize(None)
                 df_valid["ParsedDate"] = parsed.dt.normalize()
-                df_valid = df_valid.dropna(subset=["ParsedDate"])
 
                 if periode_aktif == "Harian":
                     tgl_awal = sekarang_ts
                     label_rentang = sekarang_ts.strftime("%d %b %Y")
+                    df_filtered = df_valid[
+                        df_valid["ParsedDate"].notna() &
+                        (df_valid["ParsedDate"] >= tgl_awal) &
+                        (df_valid["ParsedDate"] <= sekarang_ts)
+                    ].copy()
                 elif periode_aktif == "Mingguan":
                     tgl_awal = sekarang_ts - pd.Timedelta(days=6)
                     label_rentang = f"{tgl_awal.strftime('%d %b')} - {sekarang_ts.strftime('%d %b %Y')}"
+                    df_filtered = df_valid[
+                        df_valid["ParsedDate"].notna() &
+                        (df_valid["ParsedDate"] >= tgl_awal) &
+                        (df_valid["ParsedDate"] <= sekarang_ts)
+                    ].copy()
                 elif periode_aktif == "Bulanan":
                     tgl_awal = sekarang_ts.replace(day=1)
                     label_rentang = sekarang_ts.strftime("%B %Y")
-                else:
+                    df_filtered = df_valid[
+                        df_valid["ParsedDate"].notna() &
+                        (df_valid["ParsedDate"] >= tgl_awal) &
+                        (df_valid["ParsedDate"] <= sekarang_ts)
+                    ].copy()
+                elif periode_aktif == "Kuartal":
                     tgl_awal = (sekarang_ts.replace(day=1) - pd.DateOffset(months=2)).tz_localize(None).normalize()
                     label_rentang = f"{tgl_awal.strftime('%b %Y')} - {sekarang_ts.strftime('%b %Y')}"
-
-                tgl_awal = pd.Timestamp(tgl_awal).tz_localize(None).normalize()
-                df_filtered = df_valid[(df_valid["ParsedDate"] >= tgl_awal) & (df_valid["ParsedDate"] <= sekarang_ts)].copy()
+                    df_filtered = df_valid[
+                        df_valid["ParsedDate"].notna() &
+                        (df_valid["ParsedDate"] >= tgl_awal) &
+                        (df_valid["ParsedDate"] <= sekarang_ts)
+                    ].copy()
+                else:
+                    label_rentang = "Semua Data"
+                    df_filtered = df_valid.copy()
 
                 if nama_aktif != "Semua":
                     df_filtered = df_filtered[df_filtered["Nama"].str.strip().str.lower() == nama_aktif.lower()].copy()
@@ -884,7 +966,7 @@ with st.container(border=True):
                 ])
                 label_rentang = "-"
 
-            st.caption(f"Periode: **{periode_aktif}** ({label_rentang}) • Nama: **{nama_aktif}**")
+            st.caption(f"Periode: **{periode_aktif}** ({label_rentang}) • Nama: **{nama_aktif}** • Data: **{len(df_filtered)}** baris")
 
             total_pemasukan = float(df_filtered["jumlah uang pemasukan"].sum()) if not df_filtered.empty else 0.0
             total_pengeluaran = float(df_filtered["jumlah uang pengeluaran"].sum()) if not df_filtered.empty else 0.0
@@ -1040,7 +1122,7 @@ with st.container(border=True):
                 st.markdown('<div class="sub-title">Form Edit Data Transaksi</div>', unsafe_allow_html=True)
 
                 if not df_filtered.empty:
-                    df_urut = df_filtered.sort_values(by=["ParsedDate", "_rowNumber"], ascending=[False, False]).reset_index(drop=True)
+                    df_urut = df_filtered.sort_values(by=["ParsedDate", "_rowNumber"], ascending=[False, False], na_position="last").reset_index(drop=True)
 
                     pilihan_label = []
                     label_to_row = {}
@@ -1141,7 +1223,7 @@ with st.container(border=True):
                         }
 
                         try:
-                            resp = requests.post(WEB_APP_URL, json=payload_update, timeout=15)
+                            resp = requests.post(WEB_APP_URL, json=payload_update, timeout=20)
                             if resp.status_code == 200:
                                 ambil_data_sheets.clear()
                                 st.session_state.edit_counter += 1
