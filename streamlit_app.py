@@ -39,8 +39,6 @@ OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
     st.session_state.halaman = "Home"  # "Home", "Catatan", "Dashboard"
-if "buka_menu_opsi" not in st.session_state:
-    st.session_state.buka_menu_opsi = False
 if "dashboard_unlocked" not in st.session_state:
     st.session_state.dashboard_unlocked = False
 if "buka_menu_edit" not in st.session_state:
@@ -197,15 +195,6 @@ st.markdown(f"""
         border-radius: 16px;
         padding: 12px 14px;
         margin-bottom: 10px;
-    }}
-
-    .opsi-panel {{
-        background-color: #F8F7F4;
-        border: 1px solid #EAE7DD;
-        border-radius: 18px;
-        padding: 14px;
-        margin-top: 10px;
-        margin-bottom: 14px;
     }}
 
     .summary-label {{
@@ -390,43 +379,53 @@ components.html("""
 with st.container(border=True):
     st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
 
-    # Bar Navigasi Utama (Home saja di awal, Catatan & Dashboard berada di dalam Opsi pada Home)
-    if st.session_state.halaman != "Home":
-        if st.button("🏠 Kembali ke Home", key="nav_back_home", use_container_width=True, type="secondary"):
+    # Bar Navigasi Utama (Home / Catatan / Dashboard)
+    nav1, nav2, nav3 = st.columns(3, gap="small")
+    with nav1:
+        if st.button(
+            "🏠 Home",
+            key="nav_home",
+            use_container_width=True,
+            type="primary" if st.session_state.halaman == "Home" else "secondary"
+        ):
             st.session_state.halaman = "Home"
             st.rerun()
-        st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
+    with nav2:
+        if st.button(
+            "✍️ Catatan",
+            key="nav_catatan",
+            use_container_width=True,
+            type="primary" if st.session_state.halaman == "Catatan" else "secondary"
+        ):
+            st.session_state.halaman = "Catatan"
+            st.rerun()
+    with nav3:
+        if st.button(
+            "📊 Dashboard",
+            key="nav_dash",
+            use_container_width=True,
+            type="primary" if st.session_state.halaman == "Dashboard" else "secondary"
+        ):
+            st.session_state.halaman = "Dashboard"
+            st.rerun()
+
+    st.markdown(f"<hr style='margin: 12px 0 14px 0; border: 0; border-top: 1px solid {border_soft};'>", unsafe_allow_html=True)
 
     # =========================================================
-    # HALAMAN 1: HOME
+    # HALAMAN 1: HOME (LANGSUNG MENU CATATAN & DASHBOARD)
     # =========================================================
     if st.session_state.halaman == "Home":
         st.markdown('<div class="card-title">Home</div>', unsafe_allow_html=True)
 
-        label_opsi = "✖️ Tutup Opsi" if st.session_state.buka_menu_opsi else "⚙️ Opsi"
-        if st.button(
-            label_opsi,
-            key="btn_toggle_opsi",
-            type="primary" if st.session_state.buka_menu_opsi else "secondary",
-            use_container_width=True
-        ):
-            st.session_state.buka_menu_opsi = not st.session_state.buka_menu_opsi
+        if st.button("✍️ Menu Catatan", key="home_go_catatan", type="primary", use_container_width=True):
+            st.session_state.halaman = "Catatan"
             st.rerun()
 
-        if st.session_state.buka_menu_opsi:
-            st.markdown('<div class="opsi-panel">', unsafe_allow_html=True)
-            if st.button("✍️ Catatan", key="opsi_go_catatan", type="secondary", use_container_width=True):
-                st.session_state.halaman = "Catatan"
-                st.session_state.buka_menu_opsi = False
-                st.rerun()
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
-            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-
-            if st.button("📊 Dashboard", key="opsi_go_dash", type="secondary", use_container_width=True):
-                st.session_state.halaman = "Dashboard"
-                st.session_state.buka_menu_opsi = False
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+        if st.button("📊 Menu Dashboard", key="home_go_dash", type="secondary", use_container_width=True):
+            st.session_state.halaman = "Dashboard"
+            st.rerun()
 
     # =========================================================
     # HALAMAN 2: CATATAN
