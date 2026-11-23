@@ -527,8 +527,6 @@ else:
 banner_data_uri = _muat_banner_data_uri()
 salam_awal = _salam_waktu_wib()
 
-# Kotak tanggal di Entry punya background & border sama seperti kolom Catatan,
-# namun isi teks/ikonnya dibuat transparan saat belum dipilih agar tampak kosong
 if st.session_state.halaman == "Entry" and st.session_state.tanggal_kosong:
     css_date_empty = """
     div[data-testid="stDateInput"] > div > div {
@@ -934,6 +932,51 @@ st.markdown(f"""
         border-color: {aksen_gelap} !important;
     }}
 
+    /* Background menu Kategori: hijau saat Pemasukan, merah saat Pengeluaran */
+    div[data-testid="stElementContainer"]:has(.kategori-in) + div[data-testid="stElementContainer"] div.stButton > button {{
+        background-color: #1B4332 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #1B4332 !important;
+    }}
+    div[data-testid="stElementContainer"]:has(.kategori-in) + div[data-testid="stElementContainer"] div.stButton > button:hover {{
+        background-color: #133024 !important;
+        border-color: #133024 !important;
+        color: #FFFFFF !important;
+    }}
+
+    div[data-testid="stElementContainer"]:has(.kategori-out) + div[data-testid="stElementContainer"] div.stButton > button {{
+        background-color: #C8432B !important;
+        color: #FFFFFF !important;
+        border: 1px solid #C8432B !important;
+    }}
+    div[data-testid="stElementContainer"]:has(.kategori-out) + div[data-testid="stElementContainer"] div.stButton > button:hover {{
+        background-color: #9E2A1C !important;
+        border-color: #9E2A1C !important;
+        color: #FFFFFF !important;
+    }}
+
+    div[data-testid="stElementContainer"]:has(.kategori-opsi-in) + div[data-testid="stElementContainer"] div.stButton > button[kind="secondary"] {{
+        background-color: #EAF4EE !important;
+        color: #1B4332 !important;
+        border: 1px solid #B7D8C4 !important;
+    }}
+    div[data-testid="stElementContainer"]:has(.kategori-opsi-in) + div[data-testid="stElementContainer"] div.stButton > button[kind="secondary"]:hover {{
+        background-color: #D7EBE0 !important;
+        border-color: #1B4332 !important;
+        color: #133024 !important;
+    }}
+
+    div[data-testid="stElementContainer"]:has(.kategori-opsi-out) + div[data-testid="stElementContainer"] div.stButton > button[kind="secondary"] {{
+        background-color: #FDECE8 !important;
+        color: #9E2A1C !important;
+        border: 1px solid #F3C4B8 !important;
+    }}
+    div[data-testid="stElementContainer"]:has(.kategori-opsi-out) + div[data-testid="stElementContainer"] div.stButton > button[kind="secondary"]:hover {{
+        background-color: #FAD8CF !important;
+        border-color: #C8432B !important;
+        color: #9E2A1C !important;
+    }}
+
     div[data-testid="stTextInput"] > div > div {{
         background-color: {bg_input_soft} !important;
         border: 1.2px solid {border_soft} !important;
@@ -1240,6 +1283,8 @@ with st.container(border=True):
         """, height=0)
 
         st.markdown('<div class="field-label">Kategori</div>', unsafe_allow_html=True)
+        kelas_marker_kat = "kategori-out" if st.session_state.tipe == "Pengeluaran" else "kategori-in"
+        st.markdown(f'<span class="{kelas_marker_kat}" style="display:none;"></span>', unsafe_allow_html=True)
         label_tombol_kategori = f"**{st.session_state.kategori}**"
         if st.button(label_tombol_kategori, key="btn_buka_kategori", use_container_width=True):
             st.session_state.buka_pilih_kategori = not st.session_state.buka_pilih_kategori
@@ -1251,17 +1296,20 @@ with st.container(border=True):
                     [("💼", "Gaji"), ("👨", "Suami"), ("👩", "Istri")],
                     [("👴", "Ortu"), ("🤝", "Saudara"), ("📈", "Investasi")]
                 ]
+                kelas_opsi_kat = "kategori-opsi-in"
             else:
                 baris_kategori = [
                     [(IKON_PENGELUARAN[k], k) for k in KATEGORI_PENGELUARAN[i:i + 2]]
                     for i in range(0, len(KATEGORI_PENGELUARAN), 2)
                 ]
+                kelas_opsi_kat = "kategori-opsi-out"
 
             for idx_row, row in enumerate(baris_kategori):
                 cols = st.columns(len(row), gap="small")
                 for idx_col, (ikon, nama_kat) in enumerate(row):
                     with cols[idx_col]:
                         is_selected = (st.session_state.kategori == nama_kat)
+                        st.markdown(f'<span class="{kelas_opsi_kat}" style="display:none;"></span>', unsafe_allow_html=True)
                         if st.button(
                             f"{ikon} {nama_kat}",
                             key=f"kat_{st.session_state.tipe}_{idx_row}_{idx_col}",
