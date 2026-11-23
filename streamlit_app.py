@@ -31,6 +31,15 @@ KANDIDAT_GAMBAR = [
 ]
 
 KATEGORI_PEMASUKAN = ["Gaji", "Suami", "Istri", "Ortu", "Saudara", "Investasi"]
+IKON_PEMASUKAN = {
+    "Gaji": "💼",
+    "Suami": "👨",
+    "Istri": "👩",
+    "Ortu": "👴",
+    "Saudara": "🤝",
+    "Investasi": "📈",
+    "Lainnya": "💰"
+}
 KATEGORI_PENGELUARAN = [
     "Makan & Jajan",
     "Listrik & Air",
@@ -106,6 +115,10 @@ if "filter_nama_dash" not in st.session_state:
     st.session_state.filter_nama_dash = "Semua"
 if "edit_counter" not in st.session_state:
     st.session_state.edit_counter = 0
+if "kat_pemasukan_terpilih" not in st.session_state:
+    st.session_state.kat_pemasukan_terpilih = None
+if "kat_pengeluaran_terpilih" not in st.session_state:
+    st.session_state.kat_pengeluaran_terpilih = None
 
 def _muat_banner_data_uri():
     for kandidat in KANDIDAT_GAMBAR:
@@ -409,6 +422,80 @@ def render_donut_with_side_stats(labels, values, colors, chart_id="donutChart", 
     </body>
     </html>
     """, height=height)
+
+def render_rincian_kategori_interaktif(
+    df_subset,
+    kolom_kategori,
+    kolom_nominal,
+    state_key,
+    ikon_map,
+    mode="pengeluaran"
+):
+    if df_subset.empty:
+        jenis_lbl = "pemasukan" if mode == "pemasukan" else "pengeluaran"
+        st.info(f"Belum ada data {jenis_lbl} pada periode/filter ini.")
+        return
+
+    df_work = df_subset.copy()
+    df_work["KategoriBersih"] = df_work[kolom_kategori].replace("", "Lainnya").fillna("Lainnya")
+    total_kat = float(df_work[kolom_nominal].sum())
+    if total_kat <= 0:
+        jenis_lbl = "pemasukan" if mode == "pemasukan" else "pengeluaran"
+        st.info(f"Belum ada data {jenis_lbl} pada periode/filter ini.")
+        return
+
+    rekap = (
+        df_work.groupby("KategoriBersih", as_index=False)[kolom_nominal]
+        .sum()
+        .sort_values(kolom_nominal, ascending=False)
+    )
+
+    kategori_aktif = st.session_state.get(state_key)
+
+    for idx_r, row in rekap.iterrows():
+        kat_nama = row["KategoriBersih"]
+        kat_nom = float(row[kolom_nominal])
+        kat_pct = (kat_nom / total_kat) * 100
+        ikon = ikon_map.get(kat_nama, "💰" if mode == "pemasukan" else "📦")
+        terbuka = (kategori_aktif == kat_nama)
+        penanda = "▾" if terbuka else "▸"
+
+        if st.button(
+            f"{ikon} {kat_nama} • {format_rp(kat_nom)} ({kat_pct:.1f}%) {penanda}",
+            key=f"btn_rincian_{mode}_{kat_nama}_{idx_r}",
+            type="primary" if terbuka else "secondary",
+            use_container_width=True
+        ):
+            st.session_state[state_key] = None if terbuka else kat_nama
+            st.rerun()
+
+        if terbuka:
+            df_detail = df_work[df_work["KategoriBersih"] == kat_nama].sort_values(
+                by=["ParsedDate", "_rowNumber"],
+                ascending=[False, False],
+                na_position="last"
+            )
+            st.markdown('<div class="rincian-detail-box">', unsafe_allow_html=True)
+            for _, drow in df_detail.iterrows():
+                tgl_d = drow["ParsedDate"].strftime("%d %b %Y") if pd.notna(drow["ParsedDate"]) else drow["RawDate"]
+                nama_d = drow["Nama"] or "Bersama"
+                cat_d = f" • {drow['Catatan']}" if str(drow["Catatan"]).strip() else ""
+                nom_d = float(drow[kolom_nominal])
+                kelas_d = "trx-amt-in" if mode == "pemasukan" else "trx-amt-out"
+                tanda_d = "+" if mode == "pemasukan" else "-"
+                st.markdown(
+                    f"""
+                    <div class="rincian-item">
+                        <div>
+                            <div class="trx-title">{nama_d}{cat_d}</div>
+                            <div class="trx-sub">{tgl_d}</div>
+                        </div>
+                        <div class="{kelas_d}">{tanda_d} {format_rp(nom_d)}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            st.markdown('</div>', unsafe_allow_html=True)
 
 def build_export_dataframe(df_src):
     if df_src.empty:
@@ -728,6 +815,29 @@ st.markdown(f"""
     .trx-item:hover {{
         transform: translateY(-1px);
         border-color: #C9C4B6;
+    }}
+
+    .rincian-detail-box {{
+        background-color: #F8F7F4;
+        border: 1px solid #EAE7DD;
+        border-radius: 14px;
+        padding: 8px 10px;
+        margin: 4px 0 10px 0;
+    }}
+
+    .rincian-item {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #FFFFFF;
+        border: 1px solid #EAE7DD;
+        border-radius: 10px;
+        padding: 8px 10px;
+        margin-bottom: 6px;
+    }}
+
+    .rincian-item:last-child {{
+        margin-bottom: 0;
     }}
 
     .trx-title {{
@@ -1343,6 +1453,8 @@ with st.container(border=True):
                     st.session_state.buka_menu_edit = False
                     st.session_state.buka_menu_download = False
                     st.session_state.buka_menu_periode = False
+                    st.session_state.kat_pemasukan_terpilih = None
+                    st.session_state.kat_pengeluaran_terpilih = None
                     st.rerun()
 
             if st.button(
@@ -1507,54 +1619,31 @@ with st.container(border=True):
                 height=210
             )
 
-            st.markdown('<div class="sub-title">2. Major Expense</div>', unsafe_allow_html=True)
+            # Rincian Pemasukan per Kategori (baru muncul saat kategori diklik)
+            st.markdown('<div class="sub-title">2. Rincian Pemasukan per Kategori</div>', unsafe_allow_html=True)
+            st.caption("Klik kategori pemasukan untuk melihat rincian transaksinya.")
+            df_inc = df_filtered[df_filtered["jumlah uang pemasukan"] > 0].copy() if not df_filtered.empty else pd.DataFrame()
+            render_rincian_kategori_interaktif(
+                df_subset=df_inc,
+                kolom_kategori="Jenis Pemasukan",
+                kolom_nominal="jumlah uang pemasukan",
+                state_key="kat_pemasukan_terpilih",
+                ikon_map=IKON_PEMASUKAN,
+                mode="pemasukan"
+            )
 
+            # Rincian Pengeluaran per Kategori (baru muncul saat kategori diklik)
+            st.markdown('<div class="sub-title">3. Rincian Pengeluaran per Kategori</div>', unsafe_allow_html=True)
+            st.caption("Klik kategori pengeluaran untuk melihat rincian transaksinya.")
             df_exp = df_filtered[df_filtered["jumlah uang pengeluaran"] > 0].copy() if not df_filtered.empty else pd.DataFrame()
-            if not df_exp.empty and total_pengeluaran > 0:
-                df_exp["Kategori"] = df_exp["Jenis Pengeluaran"].replace("", "Lainnya").fillna("Lainnya")
-                rekap_kat = (
-                    df_exp.groupby("Kategori", as_index=False)["jumlah uang pengeluaran"]
-                    .sum()
-                    .sort_values("jumlah uang pengeluaran", ascending=False)
-                )
-                rekap_kat["Persentase (%)"] = (rekap_kat["jumlah uang pengeluaran"] / total_pengeluaran) * 100
-
-                palette_donut = [
-                    "#C8432B", "#E07A5F", "#F2CC8F", "#3D405B", "#81B29A",
-                    "#2A9D8F", "#E9C46A", "#F4A261", "#E76F51", "#6D597A"
-                ]
-                donut_colors = [palette_donut[i % len(palette_donut)] for i in range(len(rekap_kat))]
-
-                tinggi_box_major = min(max(210, len(rekap_kat) * 54 + 28), 340)
-                render_donut_with_side_stats(
-                    labels=rekap_kat["Kategori"].tolist(),
-                    values=rekap_kat["jumlah uang pengeluaran"].tolist(),
-                    colors=donut_colors,
-                    chart_id="chartMajorExpense",
-                    height=tinggi_box_major
-                )
-
-                for _, row in rekap_kat.iterrows():
-                    kat_nama = row["Kategori"]
-                    kat_nominal = row["jumlah uang pengeluaran"]
-                    kat_pct = row["Persentase (%)"]
-                    lebar_bar = min(max(kat_pct, 2.0), 100.0)
-                    st.markdown(
-                        f"""
-                        <div class="cat-row">
-                            <div class="cat-header">
-                                <span>{kat_nama}</span>
-                                <span>{format_rp(kat_nominal)} ({kat_pct:.1f}%)</span>
-                            </div>
-                            <div class="bar-bg">
-                                <div class="bar-fill-out" style="width: {lebar_bar:.1f}%;"></div>
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-            else:
-                st.info(f"Belum ada data pengeluaran pada periode **{periode_aktif}** ({nama_aktif}).")
+            render_rincian_kategori_interaktif(
+                df_subset=df_exp,
+                kolom_kategori="Jenis Pengeluaran",
+                kolom_nominal="jumlah uang pengeluaran",
+                state_key="kat_pengeluaran_terpilih",
+                ikon_map=IKON_PENGELUARAN,
+                mode="pengeluaran"
+            )
 
             # Menu Download
             st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
@@ -1745,4 +1834,3 @@ with st.container(border=True):
                             st.error(f"Terjadi kesalahan koneksi saat update: {e}")
                 else:
                     st.info(f"Tidak ada transaksi pada periode **{periode_aktif}** ({nama_aktif}) untuk diedit.")
-                    
