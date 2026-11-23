@@ -581,33 +581,38 @@ st.markdown(f"""
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 2px 2px 6px 2px;
+        background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%);
+        color: #FFFFFF;
+        border-radius: 18px;
+        padding: 13px 16px;
+        margin-bottom: 6px;
+        box-shadow: 0 8px 20px rgba(27, 67, 50, 0.16);
         gap: 10px;
     }}
 
     .greeting-sub {{
-        font-size: 13px;
-        color: #6B6D66;
-        margin-bottom: 1px;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.88);
+        margin-bottom: 2px;
         font-weight: 500;
     }}
 
     .greeting-name {{
         font-size: 20px;
         font-weight: 700;
-        color: #1F2421;
+        color: #FFFFFF;
         letter-spacing: -0.3px;
         line-height: 1.2;
     }}
 
     .sync-badge {{
-        background-color: rgba(0, 0, 0, 0.05);
-        color: #4A524E;
+        background-color: rgba(255, 255, 255, 0.16);
+        color: #FFFFFF;
         padding: 5px 12px;
         border-radius: 20px;
         font-size: 12px;
-        font-weight: 500;
-        border: 1px solid rgba(0, 0, 0, 0.08);
+        font-weight: 600;
+        border: 1px solid rgba(255, 255, 255, 0.22);
         white-space: nowrap;
     }}
 
@@ -1740,3 +1745,4 @@ with st.container(border=True):
                             st.error(f"Terjadi kesalahan koneksi saat update: {e}")
                 else:
                     st.info(f"Tidak ada transaksi pada periode **{periode_aktif}** ({nama_aktif}) untuk diedit.")
+                    
