@@ -1,3 +1,5 @@
+import io
+import json
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -43,6 +45,8 @@ if "dashboard_unlocked" not in st.session_state:
     st.session_state.dashboard_unlocked = False
 if "buka_menu_edit" not in st.session_state:
     st.session_state.buka_menu_edit = False
+if "buka_menu_download" not in st.session_state:
+    st.session_state.buka_menu_download = False
 if "tipe" not in st.session_state:
     st.session_state.tipe = "Pengeluaran"
 if "kategori" not in st.session_state:
@@ -104,6 +108,181 @@ def format_tgl_indo(tgl_date):
         "Juli", "Agustus", "September", "Oktober", "November", "Desember"
     ][tgl_date.month - 1]
     return f"{nama_hari}, {tgl_date.day} {bulan_str} {tgl_date.year}"
+
+def render_donut_chart(labels, values, colors, chart_id="donutChart", height=245):
+    payload_labels = json.dumps(labels)
+    payload_values = json.dumps([float(v) for v in values])
+    payload_colors = json.dumps(colors)
+    components.html(f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }}
+            body {{ background: transparent; display: flex; justify-content: center; align-items: center; }}
+            .chart-wrap {{
+                width: 100%;
+                max-width: 380px;
+                background: #F8F7F4;
+                border: 1px solid #EAE7DD;
+                border-radius: 16px;
+                padding: 12px;
+                height: {height - 16}px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="chart-wrap">
+            <canvas id="{chart_id}"></canvas>
+        </div>
+        <script>
+            const ctx = document.getElementById('{chart_id}').getContext('2d');
+            new Chart(ctx, {{
+                type: 'doughnut',
+                data: {{
+                    labels: {payload_labels},
+                    datasets: [{{
+                        data: {payload_values},
+                        backgroundColor: {payload_colors},
+                        borderColor: '#FFFFFF',
+                        borderWidth: 2,
+                        hoverOffset: 6
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '56%',
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{
+                                color: '#1F2421',
+                                font: {{ family: 'Plus Jakarta Sans', size: 11, weight: '600' }},
+                                boxWidth: 12,
+                                padding: 10
+                            }}
+                        }},
+                        tooltip: {{
+                            callbacks: {{
+                                label: function(context) {{
+                                    const val = Number(context.raw || 0);
+                                    const total = context.dataset.data.reduce((a, b) => a + Number(b || 0), 0);
+                                    const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                                    const formatted = 'Rp ' + Math.round(val).toString().replace(/\\B(?=(\\d{{3}})+(?!\\d))/g, '.');
+                                    return ' ' + context.label + ': ' + formatted + ' (' + pct + '%)';
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """, height=height)
+
+def build_export_dataframe(df_src):
+    if df_src.empty:
+        return pd.DataFrame(columns=[
+            "Tanggal", "Nama", "Jenis", "Kategori", "Pemasukan (Rp)", "Pengeluaran (Rp)", "Catatan"
+        ])
+    rows = []
+    for _, r in df_src.iterrows():
+        is_in = float(r["jumlah uang pemasukan"]) > 0
+        jenis = "Pemasukan" if is_in else "Pengeluaran"
+        kat = r["Jenis Pemasukan"] if is_in else r["Jenis Pengeluaran"]
+        tgl_str = r["ParsedDate"].strftime("%Y-%m-%d") if pd.notna(r["ParsedDate"]) else r["RawDate"]
+        rows.append({
+            "Tanggal": tgl_str,
+            "Nama": r["Nama"],
+            "Jenis": jenis,
+            "Kategori": kat,
+            "Pemasukan (Rp)": int(round(float(r["jumlah uang pemasukan"]))),
+            "Pengeluaran (Rp)": int(round(float(r["jumlah uang pengeluaran"]))),
+            "Catatan": r["Catatan"]
+        })
+    return pd.DataFrame(rows)
+
+def generate_excel_bytes(df_export):
+    buf = io.BytesIO()
+    try:
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df_export.to_excel(writer, index=False, sheet_name="Transaksi")
+        return buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"
+    except Exception:
+        csv_fallback = df_export.to_csv(index=False).encode("utf-8-sig")
+        return csv_fallback, "text/csv", "csv"
+
+def generate_pdf_bytes(periode_aktif, label_rentang, total_pemasukan, total_pengeluaran, selisih_bersih, df_export):
+    def escape_pdf_text(text):
+        clean = str(text).encode("latin-1", "replace").decode("latin-1")
+        return clean.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    lines = [
+        "LAPORAN KEUANGAN - PANJI & FEBBY",
+        f"Periode: {periode_aktif} ({label_rentang})",
+        f"Total Pemasukan : {format_rp(total_pemasukan)}",
+        f"Total Pengeluaran: {format_rp(total_pengeluaran)}",
+        f"Saldo Bersih     : {format_rp(selisih_bersih)}",
+        "------------------------------------------------------------",
+        "Daftar Transaksi:"
+    ]
+    if df_export.empty:
+        lines.append("Tidak ada transaksi pada periode ini.")
+    else:
+        for _, r in df_export.head(35).iterrows():
+            nominal_rp = format_rp(r["Pemasukan (Rp)"] if r["Jenis"] == "Pemasukan" else r["Pengeluaran (Rp)"])
+            cat_txt = f" ({r['Catatan']})" if str(r["Catatan"]).strip() else ""
+            lines.append(f"{r['Tanggal']} | {r['Nama']} | {r['Jenis']} - {r['Kategori']}: {nominal_rp}{cat_txt}")
+
+    content_ops = ["BT", "/F1 10 Tf", "40 790 Td", "14 TL"]
+    for idx, line in enumerate(lines):
+        esc = escape_pdf_text(line)
+        if idx == 0:
+            content_ops.append(f"({esc}) Tj")
+        else:
+            content_ops.append(f"T* ({esc}) Tj")
+    content_ops.append("ET")
+    stream_data = "\n".join(content_ops).encode("latin-1", "replace")
+
+    objects = []
+    objects.append(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+    objects.append(b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
+    objects.append(
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+        b"/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n"
+    )
+    objects.append(b"4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n")
+    objects.append(
+        f"5 0 obj\n<< /Length {len(stream_data)} >>\nstream\n".encode("latin-1")
+        + stream_data
+        + b"\nendstream\nendobj\n"
+    )
+
+    pdf_out = io.BytesIO()
+    pdf_out.write(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj in objects:
+        offsets.append(pdf_out.tell())
+        pdf_out.write(obj)
+
+    xref_pos = pdf_out.tell()
+    pdf_out.write(f"xref\n0 {len(offsets)}\n".encode("latin-1"))
+    pdf_out.write(b"0000000000 65535 f \n")
+    for off in offsets[1:]:
+        pdf_out.write(f"{off:010d} 00000 n \n".encode("latin-1"))
+
+    pdf_out.write(
+        f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF".encode("latin-1")
+    )
+    return pdf_out.getvalue()
 
 # Tema dinamis: merah saat di halaman Entry dengan tipe Pengeluaran, hijau untuk lainnya
 is_tema_merah = (st.session_state.halaman == "Entry" and st.session_state.tipe == "Pengeluaran")
@@ -199,6 +378,15 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
+    .download-panel {{
+        background-color: #F8F7F4;
+        border: 1px solid #EAE7DD;
+        border-radius: 16px;
+        padding: 14px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }}
+
     .summary-label {{
         font-size: 12px;
         font-weight: 600;
@@ -277,7 +465,8 @@ st.markdown(f"""
         display: none !important;
     }}
 
-    div.stButton > button {{
+    div.stButton > button,
+    div[data-testid="stDownloadButton"] > button {{
         border-radius: 999px !important;
         font-size: 13px !important;
         font-weight: 600 !important;
@@ -287,16 +476,19 @@ st.markdown(f"""
         box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
     }}
 
-    div.stButton > button p {{
+    div.stButton > button p,
+    div[data-testid="stDownloadButton"] > button p {{
         font-weight: inherit !important;
     }}
 
-    div.stButton > button[kind="secondary"] {{
+    div.stButton > button[kind="secondary"],
+    div[data-testid="stDownloadButton"] > button {{
         background-color: {bg_input_soft} !important;
         color: #000000 !important;
         border: 1px solid {border_soft} !important;
     }}
-    div.stButton > button[kind="secondary"]:hover {{
+    div.stButton > button[kind="secondary"]:hover,
+    div[data-testid="stDownloadButton"] > button:hover {{
         border-color: {aksen_utama} !important;
         color: {aksen_utama} !important;
     }}
@@ -620,6 +812,7 @@ with st.container(border=True):
                 if st.button("🔒", key="lock_dash", use_container_width=True):
                     st.session_state.dashboard_unlocked = False
                     st.session_state.buka_menu_edit = False
+                    st.session_state.buka_menu_download = False
                     st.rerun()
 
             opsi_periode = ["Harian", "Mingguan", "Bulanan", "Kuartal"]
@@ -695,13 +888,15 @@ with st.container(border=True):
             )
 
             st.markdown('<div class="sub-title">1. Pengeluaran vs Pemasukan</div>', unsafe_allow_html=True)
-            df_vs = pd.DataFrame({
-                "Jenis": ["Pemasukan", "Pengeluaran"],
-                "Nominal (Rp)": [total_pemasukan, total_pengeluaran]
-            }).set_index("Jenis")
-            st.bar_chart(df_vs, height=210, use_container_width=True)
+            render_donut_chart(
+                labels=["Pemasukan", "Pengeluaran"],
+                values=[total_pemasukan, total_pengeluaran],
+                colors=["#1B4332", "#C8432B"],
+                chart_id="chartVsInOut",
+                height=235
+            )
 
-            st.markdown('<div class="sub-title">2. Pengeluaran Paling Banyak</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sub-title">2. Major Expense</div>', unsafe_allow_html=True)
 
             df_exp = df_filtered[df_filtered["jumlah uang pengeluaran"] > 0].copy() if not df_filtered.empty else pd.DataFrame()
             if not df_exp.empty and total_pengeluaran > 0:
@@ -713,10 +908,18 @@ with st.container(border=True):
                 )
                 rekap_kat["Persentase (%)"] = (rekap_kat["jumlah uang pengeluaran"] / total_pengeluaran) * 100
 
-                st.bar_chart(
-                    rekap_kat.set_index("Kategori")[["jumlah uang pengeluaran"]],
-                    height=210,
-                    use_container_width=True
+                palette_donut = [
+                    "#C8432B", "#E07A5F", "#F2CC8F", "#3D405B", "#81B29A",
+                    "#2A9D8F", "#E9C46A", "#F4A261", "#E76F51", "#6D597A"
+                ]
+                donut_colors = [palette_donut[i % len(palette_donut)] for i in range(len(rekap_kat))]
+
+                render_donut_chart(
+                    labels=rekap_kat["Kategori"].tolist(),
+                    values=rekap_kat["jumlah uang pengeluaran"].tolist(),
+                    colors=donut_colors,
+                    chart_id="chartMajorExpense",
+                    height=265
                 )
 
                 for _, row in rekap_kat.iterrows():
@@ -741,7 +944,68 @@ with st.container(border=True):
             else:
                 st.info(f"Belum ada data pengeluaran pada periode **{periode_aktif}**.")
 
+            # Menu Download
             st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+            label_btn_dl = "✖️ Tutup Menu Download" if st.session_state.buka_menu_download else "📥 Download"
+            if st.button(
+                label_btn_dl,
+                key="toggle_menu_download",
+                type="primary" if st.session_state.buka_menu_download else "secondary",
+                use_container_width=True
+            ):
+                st.session_state.buka_menu_download = not st.session_state.buka_menu_download
+                st.rerun()
+
+            if st.session_state.buka_menu_download:
+                df_exp_file = build_export_dataframe(df_filtered)
+                stamp_tgl = sekarang_ts.strftime("%Y%m%d")
+                base_nama = f"keuangan_panji_febby_{periode_aktif.lower()}_{stamp_tgl}"
+
+                excel_bytes, excel_mime, excel_ext = generate_excel_bytes(df_exp_file)
+                csv_bytes = df_exp_file.to_csv(index=False).encode("utf-8-sig")
+                pdf_bytes = generate_pdf_bytes(
+                    periode_aktif, label_rentang,
+                    total_pemasukan, total_pengeluaran, selisih_bersih,
+                    df_exp_file
+                )
+
+                st.markdown('<div class="download-panel">', unsafe_allow_html=True)
+                st.caption(f"Pilih format file untuk periode **{periode_aktif}**:")
+
+                st.download_button(
+                    label=f"📗 Download Excel (.{excel_ext.upper()})",
+                    data=excel_bytes,
+                    file_name=f"{base_nama}.{excel_ext}",
+                    mime=excel_mime,
+                    use_container_width=True,
+                    key="dl_excel"
+                )
+
+                st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+
+                st.download_button(
+                    label="📊 Download Spreadsheet (.CSV)",
+                    data=csv_bytes,
+                    file_name=f"{base_nama}_spreadsheet.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key="dl_spreadsheet"
+                )
+
+                st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+
+                st.download_button(
+                    label="📄 Download PDF (.PDF)",
+                    data=pdf_bytes,
+                    file_name=f"{base_nama}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="dl_pdf"
+                )
+
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
             label_btn_edit = "✖️ Tutup Menu Edit" if st.session_state.buka_menu_edit else "✏️ Edit Data Transaksi"
             if st.button(
                 label_btn_edit,
