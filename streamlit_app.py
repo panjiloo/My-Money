@@ -69,7 +69,7 @@ if "buka_menu_edit" not in st.session_state:
 if "buka_menu_download" not in st.session_state:
     st.session_state.buka_menu_download = False
 if "buka_menu_periode" not in st.session_state:
-    st.session_state.buka_menu_periode = True
+    st.session_state.buka_menu_periode = False
 if "tipe" not in st.session_state:
     st.session_state.tipe = "Pengeluaran"
 if "kategori" not in st.session_state:
@@ -980,11 +980,12 @@ with st.container(border=True):
                     st.session_state.dashboard_unlocked = False
                     st.session_state.buka_menu_edit = False
                     st.session_state.buka_menu_download = False
+                    st.session_state.buka_menu_periode = False
                     st.rerun()
 
-            # Icon / Tombol Periode -> memunculkan pilihan Hari, Minggu, Bulan, Semester, Tahun, Semua
+            # Icon / Tombol Periode -> muncul hanya saat diklik
             if st.button(
-                f"🗓️ Periode: {st.session_state.periode_dash}",
+                f"🗓️ Periode ({st.session_state.periode_dash})",
                 key="toggle_menu_periode",
                 type="primary" if st.session_state.buka_menu_periode else "secondary",
                 use_container_width=True
@@ -1020,7 +1021,6 @@ with st.container(border=True):
                             st.session_state.periode_dash = p
                             st.rerun()
 
-                # Saat memilih menu Hari -> muncul kalender untuk memilih tanggal
                 if st.session_state.periode_dash == "Hari":
                     st.markdown('<div class="field-label" style="margin-top: 10px;">📅 Pilih Tanggal</div>', unsafe_allow_html=True)
                     tgl_pilihan_hari = st.date_input(
@@ -1084,7 +1084,6 @@ with st.container(border=True):
                         (df_valid["ParsedDate"] <= sekarang_ts)
                     ].copy()
                 elif periode_aktif == "Semester":
-                    # Semester 1: Jan-Jun (mulai 1 Jan), Semester 2: Jul-Des (mulai 1 Jul)
                     bulan_awal_sem = 1 if sekarang_ts.month <= 6 else 7
                     tgl_awal = sekarang_ts.replace(month=bulan_awal_sem, day=1)
                     label_rentang = f"{tgl_awal.strftime('%b %Y')} - {sekarang_ts.strftime('%b %Y')}"
