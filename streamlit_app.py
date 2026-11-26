@@ -73,7 +73,7 @@ IKON_PENGELUARAN = {
 }
 OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 OPSI_FILTER_NAMA = ["Semua", "Panji", "Febby", "Bersama"]
-OPSI_PERIODE = ["Hari", "Minggu", "Bulan", "Semester", "Tahun", "Range"]
+OPSI_PERIODE = ["Hari", "Minggu", "Bulan", "Semester", "Tahun", "Range", "Semua"]
 
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
@@ -1485,31 +1485,21 @@ with st.container(border=True):
 
             if st.session_state.buka_menu_periode:
                 st.markdown('<div class="periode-panel">', unsafe_allow_html=True)
-                cols_p1 = st.columns(3, gap="small")
-                for idx, p in enumerate(OPSI_PERIODE[:3]):
-                    with cols_p1[idx]:
-                        if st.button(
-                            p,
-                            key=f"periode_{p}",
-                            use_container_width=True,
-                            type="primary" if st.session_state.periode_dash == p else "secondary"
-                        ):
-                            st.session_state.periode_dash = p
-                            st.rerun()
-
-                st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-
-                cols_p2 = st.columns(3, gap="small")
-                for idx, p in enumerate(OPSI_PERIODE[3:]):
-                    with cols_p2[idx]:
-                        if st.button(
-                            p,
-                            key=f"periode_{p}",
-                            use_container_width=True,
-                            type="primary" if st.session_state.periode_dash == p else "secondary"
-                        ):
-                            st.session_state.periode_dash = p
-                            st.rerun()
+                baris_periode = [OPSI_PERIODE[i:i + 3] for i in range(0, len(OPSI_PERIODE), 3)]
+                for idx_bp, grup_p in enumerate(baris_periode):
+                    if idx_bp > 0:
+                        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+                    cols_p = st.columns(3, gap="small")
+                    for idx_p, p in enumerate(grup_p):
+                        with cols_p[idx_p]:
+                            if st.button(
+                                p,
+                                key=f"periode_{p}",
+                                use_container_width=True,
+                                type="primary" if st.session_state.periode_dash == p else "secondary"
+                            ):
+                                st.session_state.periode_dash = p
+                                st.rerun()
 
                 if st.session_state.periode_dash == "Hari":
                     st.markdown('<div class="field-label" style="margin-top: 10px;">📅 Pilih Tanggal</div>', unsafe_allow_html=True)
@@ -1619,7 +1609,7 @@ with st.container(border=True):
                         (df_valid["ParsedDate"] >= tgl_awal) &
                         (df_valid["ParsedDate"] <= sekarang_ts)
                     ].copy()
-                else:
+                elif periode_aktif == "Range":
                     tgl_awal_rng = pd.Timestamp(st.session_state.tanggal_range_awal).tz_localize(None).normalize()
                     tgl_akhir_rng = pd.Timestamp(st.session_state.tanggal_range_akhir).tz_localize(None).normalize()
                     if tgl_awal_rng > tgl_akhir_rng:
@@ -1630,6 +1620,9 @@ with st.container(border=True):
                         (df_valid["ParsedDate"] >= tgl_awal_rng) &
                         (df_valid["ParsedDate"] <= tgl_akhir_rng)
                     ].copy()
+                else:
+                    label_rentang = "Semua Data"
+                    df_filtered = df_valid.copy()
 
                 if nama_aktif != "Semua":
                     df_filtered = df_filtered[df_filtered["Nama"].str.strip().str.lower() == nama_aktif.lower()].copy()
