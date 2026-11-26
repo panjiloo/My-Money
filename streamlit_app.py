@@ -37,6 +37,7 @@ KATEGORI_PENGELUARAN = [
     "Pulsa & Internet",
     "Transport & BBM",
     "Belanja Bulanan/ Rumah Tangga",
+    "Suami/Istri",
     "Tabungan",
     "Kesehatan",
     "Hiburan",
