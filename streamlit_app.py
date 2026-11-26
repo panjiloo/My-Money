@@ -5,7 +5,7 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import requests
 
@@ -73,7 +73,7 @@ IKON_PENGELUARAN = {
 }
 OPSI_NAMA = ["Panji", "Febby", "Bersama"]
 OPSI_FILTER_NAMA = ["Semua", "Panji", "Febby", "Bersama"]
-OPSI_PERIODE = ["Hari", "Minggu", "Bulan", "Semester", "Tahun", "Semua"]
+OPSI_PERIODE = ["Hari", "Minggu", "Bulan", "Semester", "Tahun", "Range"]
 
 # 2. Inisialisasi Session State
 if "halaman" not in st.session_state:
@@ -108,6 +108,10 @@ if "periode_dash" not in st.session_state:
     st.session_state.periode_dash = "Bulan"
 if "tanggal_hari_dash" not in st.session_state:
     st.session_state.tanggal_hari_dash = datetime.now(ZoneInfo("Asia/Jakarta")).date()
+if "tanggal_range_awal" not in st.session_state:
+    st.session_state.tanggal_range_awal = datetime.now(ZoneInfo("Asia/Jakarta")).date().replace(day=1)
+if "tanggal_range_akhir" not in st.session_state:
+    st.session_state.tanggal_range_akhir = datetime.now(ZoneInfo("Asia/Jakarta")).date()
 if "filter_nama_dash" not in st.session_state:
     st.session_state.filter_nama_dash = "Semua"
 if "edit_counter" not in st.session_state:
@@ -1518,6 +1522,35 @@ with st.container(border=True):
                     )
                     st.session_state.tanggal_hari_dash = tgl_pilihan_hari
 
+                elif st.session_state.periode_dash == "Range":
+                    st.markdown('<div class="field-label" style="margin-top: 10px;">📅 Rentang Tanggal (Dari - Sampai)</div>', unsafe_allow_html=True)
+                    c_r1, c_r2 = st.columns(2, gap="small")
+                    with c_r1:
+                        st.caption("Tgl Awal")
+                        tgl_awal_pilihan = st.date_input(
+                            "Tgl Awal",
+                            value=st.session_state.tanggal_range_awal,
+                            format="DD/MM/YYYY",
+                            label_visibility="collapsed",
+                            key="kalender_range_awal"
+                        )
+                    with c_r2:
+                        st.caption("Tgl Akhir")
+                        tgl_akhir_pilihan = st.date_input(
+                            "Tgl Akhir",
+                            value=st.session_state.tanggal_range_akhir,
+                            format="DD/MM/YYYY",
+                            label_visibility="collapsed",
+                            key="kalender_range_akhir"
+                        )
+
+                    if tgl_awal_pilihan > tgl_akhir_pilihan:
+                        tgl_akhir_pilihan = tgl_awal_pilihan
+                        st.caption("⚠️ Tgl Akhir disesuaikan agar tidak lebih awal dari Tgl Awal.")
+
+                    st.session_state.tanggal_range_awal = tgl_awal_pilihan
+                    st.session_state.tanggal_range_akhir = tgl_akhir_pilihan
+
                 st.markdown('</div>', unsafe_allow_html=True)
 
             st.markdown('<div class="field-label" style="margin-top: 10px;">Filter Nama</div>', unsafe_allow_html=True)
@@ -1587,8 +1620,16 @@ with st.container(border=True):
                         (df_valid["ParsedDate"] <= sekarang_ts)
                     ].copy()
                 else:
-                    label_rentang = "Semua Data"
-                    df_filtered = df_valid.copy()
+                    tgl_awal_rng = pd.Timestamp(st.session_state.tanggal_range_awal).tz_localize(None).normalize()
+                    tgl_akhir_rng = pd.Timestamp(st.session_state.tanggal_range_akhir).tz_localize(None).normalize()
+                    if tgl_awal_rng > tgl_akhir_rng:
+                        tgl_awal_rng, tgl_akhir_rng = tgl_akhir_rng, tgl_awal_rng
+                    label_rentang = f"{tgl_awal_rng.strftime('%d %b %Y')} - {tgl_akhir_rng.strftime('%d %b %Y')}"
+                    df_filtered = df_valid[
+                        df_valid["ParsedDate"].notna() &
+                        (df_valid["ParsedDate"] >= tgl_awal_rng) &
+                        (df_valid["ParsedDate"] <= tgl_akhir_rng)
+                    ].copy()
 
                 if nama_aktif != "Semua":
                     df_filtered = df_filtered[df_filtered["Nama"].str.strip().str.lower() == nama_aktif.lower()].copy()
