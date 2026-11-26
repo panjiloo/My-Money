@@ -56,6 +56,7 @@ IKON_PENGELUARAN = {
     "Transport & BBM": "⛽",
     "Belanja Bulanan/ Rumah Tangga": "🧺",
     "Tabungan": "🐷",
+    "Suami/Istri": "🥰",
     "Kesehatan": "💊",
     "Hiburan": "🍦",
     "Sedekah & Sosial": "🤲",
@@ -1336,7 +1337,6 @@ with st.container(border=True):
             if tanggal_input is not None and st.session_state.tanggal_kosong:
                 st.session_state.tanggal_kosong = False
                 st.rerun()
-            tanggal_efektif = tanggal_input if tanggal_input is not None else hari_ini_wib
         with col_cat:
             st.markdown('<div class="field-label">Catatan</div>', unsafe_allow_html=True)
             placeholder_cat = "mis. honor rapat" if st.session_state.tipe == "Pemasukan" else "mis. belanja mingguan"
@@ -1349,8 +1349,10 @@ with st.container(border=True):
 
         st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
         if st.button("Submit", type="primary", use_container_width=True):
-            if val_nominal > 0 and st.session_state.kategori != "Kategori":
-                format_tgl_lengkap = format_tgl_indo(tanggal_efektif)
+            if st.session_state.tanggal_kosong or tanggal_input is None:
+                st.warning("Tanggal belum terisi")
+            elif val_nominal > 0 and st.session_state.kategori != "Kategori":
+                format_tgl_lengkap = format_tgl_indo(tanggal_input)
 
                 jns_pengeluaran = st.session_state.kategori if st.session_state.tipe == "Pengeluaran" else ""
                 jml_pengeluaran = val_nominal if st.session_state.tipe == "Pengeluaran" else 0
@@ -1367,7 +1369,7 @@ with st.container(border=True):
                     "Jenis_Pemasukan": jns_pemasukan,
                     "Jumlah_Uang_Pemasukan": jml_pemasukan,
                     "Catatan": catatan,
-                    "RawDate": tanggal_efektif.strftime("%Y-%m-%d")
+                    "RawDate": tanggal_input.strftime("%Y-%m-%d")
                 }
 
                 try:
