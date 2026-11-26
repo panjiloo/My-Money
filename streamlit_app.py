@@ -18,7 +18,7 @@ st.set_page_config(
 )
 
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwqn9gHoy2ucq237Lr-0mevxh_7anpTPHym4r3IG1jChXvIY4RK-I9VfaEfYHbE00M2/exec"
-DASHBOARD_PASSWORD = "febbycantik123"
+DASHBOARD_PASSWORD = "kayaraya"
 
 BASE_DIR = Path(__file__).resolve().parent
 KANDIDAT_GAMBAR = [
