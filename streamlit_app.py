@@ -175,7 +175,7 @@ def _cari_kolom(df, kandidat_nama):
     return None
 
 # 3. Fungsi Ambil & Bersihkan Data dari Google Sheets
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=300, show_spinner=False)
 def ambil_data_sheets(url):
     kolom_standar = [
         "_rowNumber", "Nama", "Hari tanggal bulan tahun", "Jenis Pengeluaran",
@@ -241,6 +241,10 @@ def ambil_data_sheets(url):
     except Exception:
         pass
     return pd.DataFrame(columns=kolom_standar)
+
+def muat_data_dengan_status(url=WEB_APP_URL):
+    with st.spinner("Waiting ⏳"):
+        return ambil_data_sheets(url)
 
 def format_rp(angka):
     return f"Rp {int(round(angka)):,}".replace(",", ".")
@@ -588,6 +592,13 @@ st.markdown(f"""
     .stApp {{
         background-color: {bg_app} !important;
         transition: background-color 0.25s ease !important;
+    }}
+
+    /* Sembunyikan indikator "Running <fungsi>(...)" bawaan Streamlit */
+    div[data-testid="stStatusWidget"],
+    [data-testid="stStatusWidget"] {{
+        display: none !important;
+        visibility: hidden !important;
     }}
 
     header[data-testid="stHeader"], footer {{
@@ -1095,22 +1106,29 @@ with st.container(border=True):
     # HALAMAN 1: HOME (INTERAKTIF & RINGKAS)
     # =========================================================
     if st.session_state.halaman == "Home":
-        df_home_raw = ambil_data_sheets(WEB_APP_URL)
         sekarang_home = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).tz_localize(None).normalize()
         awal_bulan_home = sekarang_home.replace(day=1)
 
-        if not df_home_raw.empty and "ParsedDate" in df_home_raw.columns:
-            df_home_bulanan = df_home_raw[
-                df_home_raw["ParsedDate"].notna() &
-                (df_home_raw["ParsedDate"] >= awal_bulan_home) &
-                (df_home_raw["ParsedDate"] <= sekarang_home)
-            ]
-        else:
-            df_home_bulanan = pd.DataFrame()
+        perlu_data_home = (not st.session_state.hide_home_nominal) or st.session_state.buka_transaksi_terakhir
+        if perlu_data_home:
+            df_home_raw = muat_data_dengan_status(WEB_APP_URL)
+            if not df_home_raw.empty and "ParsedDate" in df_home_raw.columns:
+                df_home_bulanan = df_home_raw[
+                    df_home_raw["ParsedDate"].notna() &
+                    (df_home_raw["ParsedDate"] >= awal_bulan_home) &
+                    (df_home_raw["ParsedDate"] <= sekarang_home)
+                ]
+            else:
+                df_home_bulanan = pd.DataFrame()
 
-        in_bulan_home = float(df_home_bulanan["jumlah uang pemasukan"].sum()) if not df_home_bulanan.empty else 0.0
-        out_bulan_home = float(df_home_bulanan["jumlah uang pengeluaran"].sum()) if not df_home_bulanan.empty else 0.0
-        saldo_bulan_home = in_bulan_home - out_bulan_home
+            in_bulan_home = float(df_home_bulanan["jumlah uang pemasukan"].sum()) if not df_home_bulanan.empty else 0.0
+            out_bulan_home = float(df_home_bulanan["jumlah uang pengeluaran"].sum()) if not df_home_bulanan.empty else 0.0
+            saldo_bulan_home = in_bulan_home - out_bulan_home
+        else:
+            df_home_raw = pd.DataFrame()
+            in_bulan_home = 0.0
+            out_bulan_home = 0.0
+            saldo_bulan_home = 0.0
 
         is_hidden = st.session_state.hide_home_nominal
         tampil_saldo = "****" if is_hidden else format_rp(saldo_bulan_home)
@@ -1401,7 +1419,8 @@ with st.container(border=True):
                 }
 
                 try:
-                    response = requests.post(WEB_APP_URL, json=payload, timeout=20)
+                    with st.spinner("Waiting ⏳"):
+                        response = requests.post(WEB_APP_URL, json=payload, timeout=20)
                     if response.status_code == 200:
                         ambil_data_sheets.clear()
                         st.success(f"Berhasil tersimpan: {st.session_state.tipe} {format_rp(val_nominal)}!")
@@ -1514,7 +1533,7 @@ with st.container(border=True):
                         st.session_state.filter_nama_dash = nm
                         st.rerun()
 
-            df_raw = ambil_data_sheets(WEB_APP_URL)
+            df_raw = muat_data_dengan_status(WEB_APP_URL)
 
             sekarang_ts = pd.Timestamp.now(ZoneInfo("Asia/Jakarta")).tz_localize(None).normalize()
             periode_aktif = st.session_state.periode_dash
@@ -1839,7 +1858,8 @@ with st.container(border=True):
                         }
 
                         try:
-                            resp = requests.post(WEB_APP_URL, json=payload_update, timeout=20)
+                            with st.spinner("Waiting ⏳"):
+                                resp = requests.post(WEB_APP_URL, json=payload_update, timeout=20)
                             if resp.status_code == 200:
                                 ambil_data_sheets.clear()
                                 st.session_state.edit_counter += 1
