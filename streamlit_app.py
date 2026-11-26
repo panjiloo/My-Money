@@ -37,8 +37,8 @@ KATEGORI_PENGELUARAN = [
     "Pulsa & Internet",
     "Transport & BBM",
     "Belanja Bulanan/ Rumah Tangga",
-    "Suami/Istri",
     "Tabungan",
+    "Istri",
     "Kesehatan",
     "Hiburan",
     "Sedekah & Sosial",
@@ -57,7 +57,7 @@ IKON_PENGELUARAN = {
     "Transport & BBM": "⛽",
     "Belanja Bulanan/ Rumah Tangga": "🧺",
     "Tabungan": "🐷",
-    "Suami/Istri": "🥰",
+    "Istri": "🥰",
     "Kesehatan": "💊",
     "Hiburan": "🍦",
     "Sedekah & Sosial": "🤲",
@@ -80,6 +80,8 @@ if "entry_mode_terkunci" not in st.session_state:
     st.session_state.entry_mode_terkunci = False
 if "hide_home_nominal" not in st.session_state:
     st.session_state.hide_home_nominal = True
+if "buka_transaksi_terakhir" not in st.session_state:
+    st.session_state.buka_transaksi_terakhir = False
 if "dashboard_unlocked" not in st.session_state:
     st.session_state.dashboard_unlocked = False
 if "buka_menu_edit" not in st.session_state:
@@ -1170,38 +1172,61 @@ with st.container(border=True):
             st.session_state.halaman = "Dashboard"
             st.rerun()
 
-        st.markdown('<div class="sub-title">🕒 Transaksi Terakhir</div>', unsafe_allow_html=True)
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        label_btn_trx = "✖️ Tutup Transaksi Terakhir" if st.session_state.buka_transaksi_terakhir else "🕒 Transaksi Terakhir"
+        if st.button(
+            label_btn_trx,
+            key="btn_toggle_transaksi_terakhir",
+            type="primary" if st.session_state.buka_transaksi_terakhir else "secondary",
+            use_container_width=True
+        ):
+            st.session_state.buka_transaksi_terakhir = not st.session_state.buka_transaksi_terakhir
+            st.rerun()
 
-        if not df_home_raw.empty:
-            df_recent = df_home_raw.sort_values(
-                by=["ParsedDate", "_rowNumber"],
-                ascending=[False, False],
-                na_position="last"
-            ).head(3)
+        if st.session_state.buka_transaksi_terakhir:
+            if not st.session_state.dashboard_unlocked:
+                st.caption("Masukkan kata sandi yang sama seperti Dashboard untuk melihat detail transaksi terakhir.")
+                with st.form("form_password_transaksi_terakhir", clear_on_submit=False):
+                    input_pw_trx = st.text_input("Kata Sandi", type="password", placeholder="Masukkan kata sandi...")
+                    submitted_pw_trx = st.form_submit_button("Buka Transaksi Terakhir", type="primary", use_container_width=True)
 
-            for _, r in df_recent.iterrows():
-                is_in = float(r["jumlah uang pemasukan"]) > 0
-                kat_lbl = r["Jenis Pemasukan"] if is_in else (r["Jenis Pengeluaran"] or "Lainnya")
-                nom_val = float(r["jumlah uang pemasukan"]) if is_in else float(r["jumlah uang pengeluaran"])
-                tgl_lbl = r["ParsedDate"].strftime("%d %b") if pd.notna(r["ParsedDate"]) else r["RawDate"]
-                cat_lbl = f" • {r['Catatan']}" if str(r["Catatan"]).strip() else ""
-                kelas_amt = "trx-amt-in" if is_in else "trx-amt-out"
-                tanda_amt = "+" if is_in else "-"
+                if submitted_pw_trx:
+                    if input_pw_trx == DASHBOARD_PASSWORD:
+                        st.session_state.dashboard_unlocked = True
+                        st.rerun()
+                    else:
+                        st.error("Kata sandi salah. Silakan coba lagi.")
+            else:
+                if not df_home_raw.empty:
+                    df_recent = df_home_raw.sort_values(
+                        by=["ParsedDate", "_rowNumber"],
+                        ascending=[False, False],
+                        na_position="last"
+                    ).head(3)
 
-                st.markdown(
-                    f"""
-                    <div class="trx-item">
-                        <div>
-                            <div class="trx-title">{kat_lbl}</div>
-                            <div class="trx-sub">{tgl_lbl} • {r["Nama"] or "Bersama"}{cat_lbl}</div>
-                        </div>
-                        <div class="{kelas_amt}">{tanda_amt} {format_rp(nom_val)}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-        else:
-            st.caption("Belum ada transaksi tercatat. Klik **Catat Pengeluaran** atau **Catat Pemasukan** di atas untuk mulai.")
+                    for _, r in df_recent.iterrows():
+                        is_in = float(r["jumlah uang pemasukan"]) > 0
+                        kat_lbl = r["Jenis Pemasukan"] if is_in else (r["Jenis Pengeluaran"] or "Lainnya")
+                        nom_val = float(r["jumlah uang pemasukan"]) if is_in else float(r["jumlah uang pengeluaran"])
+                        tgl_lbl = r["ParsedDate"].strftime("%d %b") if pd.notna(r["ParsedDate"]) else r["RawDate"]
+                        cat_lbl = f" • {r['Catatan']}" if str(r["Catatan"]).strip() else ""
+                        kelas_amt = "trx-amt-in" if is_in else "trx-amt-out"
+                        tanda_amt = "+" if is_in else "-"
+
+                        st.markdown(
+                            f"""
+                            <div class="trx-item">
+                                <div>
+                                    <div class="trx-title">{kat_lbl}</div>
+                                    <div class="trx-sub">{tgl_lbl} • {r["Nama"] or "Bersama"}{cat_lbl}</div>
+                                </div>
+                                <div class="{kelas_amt}">{tanda_amt} {format_rp(nom_val)}</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.caption("Belum ada transaksi tercatat. Klik **Catat Pengeluaran** atau **Catat Pemasukan** di atas untuk mulai.")
 
     # =========================================================
     # HALAMAN 2: ENTRY
