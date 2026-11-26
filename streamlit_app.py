@@ -48,6 +48,7 @@ KATEGORI_PENGELUARAN = [
     "Kebutuhan Anak",
     "Pendidikan Anak",
     "Cicilan",
+    "Make Up/ Skin Care",
     "Lainnya"
 ]
 IKON_PENGELUARAN = {
@@ -67,6 +68,7 @@ IKON_PENGELUARAN = {
     "Kebutuhan Anak": "🧸",
     "Pendidikan Anak": "🎒",
     "Cicilan": "🏠",
+    "Make Up/ Skin Care": "💄",
     "Lainnya": "📦"
 }
 OPSI_NAMA = ["Panji", "Febby", "Bersama"]
